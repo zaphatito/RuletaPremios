@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+
+{% block title %}
+    Polls
+{% endblock title %}
+    Polls
+{% block content %}
+
+<div class="container">
+    <div "col-md-4">
+
+        <h1>{{ encuesta.titulo }}</h1>
+        <p>{{ encuesta.descripcion }}</p>
+
+        <h3>Encuesta disponible en la tienda: {{ tienda.nombre }}</h3>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        <div class="text-danger">{{ field.errors }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary">Enviar</button>            
+        </form>
+
+
+
+
+
+    </div>
+</div>
+{% endblock content %}
+    

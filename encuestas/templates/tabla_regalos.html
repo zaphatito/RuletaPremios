@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block header %}
+<style>
+body {
+    background-color: #003468 !important;
+    /* background-image: url("{% static 'img/fondoruleta.png' %}");*/
+    background-repeat: repeat;
+    font-family: "Montserrat", sans-serif !important;
+    color: #eeeeee !important;
+}
+
+.card {
+    /* Fondo blanco con un 80% de opacidad (20% de transparencia) */
+    background-color: rgba(0, 0, 0, 0) !important;
+    
+    /* background-color: none !important;*/
+}
+
+.card-borde-personalizado,
+.card-borde-personalizado .card-header,
+.card-borde-personalizado .card-footer {
+    border-color: none ; /* O el color que prefieras */
+    border: 0px solid rgba(0, 0, 0, .125) !important;
+    background-color: rgba(0, 0, 0, 0) !important;
+}
+
+.label-ruleta {
+    font-size: 15px;
+    font-weight: 600; 
+}
+
+.titulo-ruleta {
+    font-size: 20px;
+    font-weight: 600; 
+}
+
+
+.header {
+    padding: 40px;
+    color: #fff;
+    margin: 0 auto;
+    margin-bottom: 40px;
+}
+
+.header h1,p {
+    text-align: center;
+}
+
+.cajas {
+    position: relative;
+}
+
+.regalos-grid {
+  display: grid; /* Activa el layout de CSS Grid */
+  grid-template-columns: repeat(3, 1fr); /* Crea 3 columnas de igual tamaño */
+  gap: 10px; /* Espacio entre las imágenes */
+  max-width: 400px; /* Ancho máximo para el contenedor del juego */
+  margin: 0 auto; /* Centra el contenedor del juego */
+}
+.celdaregalo {
+  width: 100%; /* Cada celda ocupa todo el ancho disponible */
+  aspect-ratio: 1 / 1; /* Mantiene la proporción cuadrada */
+  display: flex; /* Permite centrar el contenido */
+  justify-content: center; /* Centra horizontalmente */
+  align-items: center; /* Centra verticalmente */
+  cursor: pointer; /* Muestra una mano al pasar el mouse */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.regalo.seleccionada {
+  opacity: 0.5; /* Reduce la opacidad para que se vea "apagada" */
+  cursor: not-allowed; /* Muestra un cursor de "no permitido" */
+  transform: scale(0.95); /* Opcional: la hace un poco más pequeña */
+  box-shadow: none; /* Opcional: quita cualquier sombra */
+  border-style: solid;
+}
+
+
+.regalo {
+  width: 100%; /* La imagen ocupa todo el ancho de su celda */
+  aspect-ratio: 1 / 1; /* Mantiene la proporción cuadrada */
+  cursor: pointer; /* Muestra una mano al pasar el mouse */
+  transition: transform 0.2s ease;
+}
+
+.regalo:hover {
+  transform: scale(1.05); /* Efecto de zoom al pasar el mouse */
+}
+
+@media (max-width: 537px) {
+    .cajas {
+        width: 300px;
+    }
+}
+
+</style>    
+{% endblock  %}
+   
+{% block title %}
+    Regalos de la suerte
+{% endblock title %}
+    
+{% block content %}
+<!-- Modal de Bootstrap -->
+<div class="modal fade" id="premioModal" tabindex="-1" aria-labelledby="premioModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="premioModalLabel">¡Felicidades!</h5>
+        </div>
+        <div class="modal-body">
+          <p id="mensajePremio"></p> <!-- Aquí aparecerá el premio ganado -->
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="container"></div>
+    <div class="row mb-1">
+        <div class="col-1 col-md-4 themed-grid-col"></div>
+        <div class="col-10 col-md-4 themed-grid-col">
+            <br>
+            <div class="card card-borde-personalizado">
+                <form method="POST">
+                    <div class="card-header">
+                        <img src="{% static 'img/Logo_EFperfumes1.png' %}" class="img-fluid mx-auto d-block" alt="...">
+						<h5 class="card-title titulo-ruleta text-center">Regalos de EF Perfumes</h5>
+						<div class="row mb-3">
+							<div class="col-6 themed-grid-col">Tienda: {{ tienda }}</div>
+							<div class="col-6 themed-grid-col">Ticket: {{ codigo_ticket }}</div>
+						</div>
+						
+						<div class="row mb-3" style="display: none;">
+							<div class="col-6 themed-grid-col" >Premio</div>
+							<div class="col-6 themed-grid-col"><p id="winner" style="display: none;">&nbsp;</p></div>
+						</div> 
+                    </div>
+                    <div class="card-body">
+                        <h1 class="text-center">¡Elige un Regalo!</h1>
+                        <p>Tienes hasta 3 intentos para encontrar tu premio.</p>
+
+                        <div class="regalos-grid">
+                            {% for i in "123456789" %}
+                                <div class="celdaregalo">
+                                    <img src="{% static 'images/juego_regalos/caja.png' %}" class="regalo" alt="Regalo">
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div id="mensaje-animo" class="text-center"></div>
+                        <div id="resultado-premio" class="text-center"></div>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+        <div class="col-1 col-md-4 themed-grid-col"></div>
+    </div>
+</div>
+<br>
+
+
+
+
+
+{% endblock content %}
+    
+
+{% block js_footer %}
+<script id="premios-data" type="application/json">{{ premiosDat|safe }}</script>
+<script>
+
+
+
+
+
+
+
+// Obtener los datos de premios y probabilidades desde el script JSON
+const premiosRawData = document.getElementById('premios-data').textContent;
+let modifiedString = premiosRawData.replace(/'/g, '"');
+const array = JSON.parse(modifiedString);
+const premiosData = array;
+const premios = premiosData.map(premio => premio.nombre);
+const probabilidades = premiosData.map(premio => premio.probabilidad);
+
+
+
+// Variables para controlar el estado del juego
+let intentosRealizados = 0;
+const maxIntentos = 3;
+let juegoTerminado = false;
+
+const intentoGanador = Math.floor(Math.random() * 3) + 1;
+console.log(`El intento ganador será el número: ${intentoGanador}`);
+
+// Seleccionar todas las celdas de regalos
+const celdasRegalos = document.querySelectorAll('.regalo');
+const mensajeAnimoEl = document.getElementById('mensaje-animo'); // Asumo que tienes un <div id="mensaje-animo"></div>
+const resultadoPremioEl = document.getElementById('resultado-premio'); // Asumo que tienes un <div id="resultado-premio"></div>
+
+// Añadir evento de clic a cada celda
+celdasRegalos.forEach((celda) => {
+    celda.addEventListener('click', () => {
+        // No hacer nada si el juego ya terminó o si la caja ya fue abierta
+        if (juegoTerminado || celda.classList.contains('seleccionada')) {
+            return;
+        }
+
+        intentosRealizados++; // Incrementar el contador de intentos
+        celda.classList.add('seleccionada'); // Marcar la caja como "abierta" para no poder repetirla
+
+        // --- ¡DECISIÓN PRINCIPAL! ---
+        // Comparamos el número de intentos actual con el intento ganador sorteado
+        console.log(`intentosRealizados: ${intentosRealizados}`);
+        console.log(`intentosGanador: ${intentoGanador}`);
+        if (intentosRealizados === intentoGanador) {
+            // ¡EL USUARIO GANA!
+            juegoTerminado = true;
+            mensajeAnimoEl.innerText = ''; // Limpiamos el mensaje de ánimo
+
+            // Seleccionamos el premio AHORA, usando la función de probabilidades
+            const premioSeleccionado = selectPrize(premios, probabilidades);
+
+            // Mostramos el premio (puedes adaptar esto a tu función de modal)
+            resultadoPremioEl.innerText = `¡Felicidades! Has ganado: ${premioSeleccionado}`;
+            // Aquí deberías llamar a tu función para mostrar el modal y guardar
+            mostrarPremio(premioSeleccionado); 
+            
+            // Opcional: Cambiar la imagen de la caja ganadora
+            // celda.src = "{% static 'images/juego_regalos/premio_trofeo.png' %}";
+        } else {
+            // EL USUARIO AÚN NO GANA
+            mensajeAnimoEl.innerText = `¡Casi! Sigue intentando. Te quedan ${maxIntentos - intentosRealizados} oportunidades.`;
+            console.log(`Te quedan: ${maxIntentos - intentosRealizados}`);
+
+            // Opcional: Cambiar la imagen para mostrar una caja vacía
+            // celda.src = "{% static 'images/juego_regalos/regalo_vacio.png' %}";
+
+            // Si se acabaron los intentos y no ganó, termina el juego
+            if (intentosRealizados >= maxIntentos) {
+                juegoTerminado = true;
+                mensajeAnimoEl.innerText = "¡Oh! Mejor suerte para la próxima.";
+            }
+        }
+    });
+});
+
+function selectPrize(premios, probabilidades) {
+        // Asegúrate de que la longitud de ambos arrays coincida
+        if (premios.length !== probabilidades.length) {
+            throw new Error("Las longitudes de premios y probabilidades deben ser iguales.");
+        }
+
+        // Calcula la suma total de las probabilidades
+        const totalProbability = probabilidades.reduce((a, b) => a + b, 0);
+        console.log(totalProbability);
+        // Genera un número aleatorio entre 0 y totalProbability
+        const random = Math.random() * totalProbability;
+
+        // Calcula el rango acumulado de probabilidades
+        let accumulated = 0;
+
+        // Recorre las probabilidades y determina en qué rango cae el número aleatorio
+        for (let i = 0; i < probabilidades.length; i++) {
+            accumulated += probabilidades[i];
+            if (random < accumulated) {
+                return premios[i];
+            }
+        }
+    }
+
+
+
+
+
+
+
+    function mostrarPremio(premio) {
+        // Establecer el texto del premio en el modal
+        document.getElementById('mensajePremio').innerText = premio;
+        
+        // Mostrar el modal
+        var premioModal = new bootstrap.Modal(document.getElementById('premioModal'));
+        premioModal.show();
+
+        // Después de 5 segundos, enviar el formulario por POST
+        setTimeout(function() {
+        enviarDatosPremio();
+        }, 100);  // 5000 ms = 5 segundos
+    }
+
+  // Función para enviar los datos por POST
+    function enviarDatosPremio() {
+        // Crear un formulario y enviarlo por POST
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/polls/guardar-premio/';  // Cambia esto a la URL de tu vista 'guardar_premio'
+
+        // Token CSRF (necesario para Django)
+        var csrfToken = '{{ csrf_token }}';  // Asegúrate de que el token CSRF esté disponible en la plantilla
+        var csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+
+        // Añadir datos del premio
+        var premioInput = document.createElement('input');
+        premioInput.type = 'hidden';
+        premioInput.name = 'premio';
+        premioInput.value = document.getElementById('mensajePremio').innerText;
+        form.appendChild(premioInput);
+
+        // Otros datos necesarios (e.g., codigo_ticket)
+        var codigoTicketInput = document.createElement('input');
+        codigoTicketInput.type = 'hidden';
+        codigoTicketInput.name = 'codigo_ticket';
+        codigoTicketInput.value = '{{ codigo_ticket }}';  // Asegúrate de pasar esta variable
+        form.appendChild(codigoTicketInput);
+
+        var encuesta_fijaInput = document.createElement('input');
+        encuesta_fijaInput.type = 'hidden';
+        encuesta_fijaInput.name = 'encuesta_fija';
+        encuesta_fijaInput.value = '{{ encuesta_id }}';  // Asegúrate de pasar esta variable
+        form.appendChild(encuesta_fijaInput);
+
+        var tiendaInput = document.createElement('input');
+        tiendaInput.type = 'hidden';
+        tiendaInput.name = 'tienda';
+        tiendaInput.value = '{{ tienda.id }}';  // Asegúrate de pasar esta variable
+        form.appendChild(tiendaInput);
+
+
+
+        // Agregar el formulario al DOM y enviarlo
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+</script>
+
+{% endblock %}

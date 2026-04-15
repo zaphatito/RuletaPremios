@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+{% block header %}  
+<style>
+    body {
+        background-color: #eeeeee;
+        background-image: url("{% static 'img/fondoruleta.png' %}");
+        background-repeat: repeat repeat;
+    
+        text-align: start; 
+        transition-property: opacity, transform; 
+        font-family: 'Red Hat Display' !important; 
+        font-style: normal; 
+        font-stretch: normal; 
+        font-optical-sizing: auto; 
+        line-height: initial; 
+        opacity: 1; 
+        transition-duration: 350ms;
+    }
+    
+    .label-ruleta {
+        font-size: 15px;
+        font-weight: 600; 
+    }
+    
+    .titulo-ruleta {
+        font-size: 20px;
+        font-weight: 600; 
+    }
+    
+    .header {
+        padding: 40px;
+        color: #fff;
+        margin: 0 auto;
+        margin-bottom: 40px;
+    }
+    
+    .header h1,p {
+        text-align: center;
+    }
+    
+    textarea {
+        background-color: rgba(20, 20, 20, 0.2);
+        caret-color: #fff;
+        resize: none;
+        color: #fff;
+    }
+    
+    .inputArea {
+        display: flex;
+        justify-content: center;
+        margin-top: 40px;
+    }
+    
+</style>
+
+
+{% endblock %}
+
+
+{% block title %}
+Politicas de Privacidad
+{% endblock title %}
+
+
+{% block content %}
+<title></title>
+
+
+
+<div class="container">
+    <div class="row mb-1">
+        <div class="col-1 col-md-3 themed-grid-col"></div>
+        <div class="col-10 col-md-6 themed-grid-col">
+
+
+            <br>
+            <div class="card">
+                <form method="POST">
+                    <div class="card-header">
+                        <img src="{% static 'img/Logo_EFperfumes1.png' %}" class="img-fluid mx-auto d-block" alt="...">
+                        <p class="text-center">¡ Políticas de Privacidad del Módulo de premios y sorpresas para clientes de EF Perfumes !</p>
+                    </div>
+                    <div class="card-body text-center">
+                        <h3>Políticas de Privacidad</h3>
+                        <p>f gfg df gsdg dfgdf</p>
+                        <p>gfdg fdgf sgsdfg dg dfgf</p>
+
+                    </div>
+                    <!-- Botón de envío -->
+                    <div class="card-footer text-center">
+
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+<br>
+
+
+
+
+
+
+
+
+{% endblock content %}
+   
+
+{% block js_footer %}
+{% endblock  %}
+
+

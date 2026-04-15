@@ -1,0 +1,531 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block header %}
+<style>
+body {
+    background-color: #eeeeee;
+    background-image: url("{% static 'img/fondoruleta.png' %}");
+    background-repeat: repeat repeat;
+
+    text-align: start; 
+    transition-property: opacity, transform; 
+    font-family: 'Red Hat Display' !important; 
+    font-style: normal; 
+    font-stretch: normal; 
+    font-optical-sizing: auto; 
+    line-height: initial; 
+    opacity: 1; 
+    transition-duration: 350ms;
+}
+
+.label-ruleta {
+    font-size: 15px;
+    font-weight: 600; 
+}
+
+.titulo-ruleta {
+    font-size: 20px;
+    font-weight: 600; 
+}
+
+
+.center-image {
+    width: 60%;  /* Ajusta este valor según el tamaño de tu imagen */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); /* Centra la imagen en el círculo */
+}
+
+.header {
+    padding: 40px;
+    color: #fff;
+    margin: 0 auto;
+    margin-bottom: 40px;
+}
+
+.header h1,p {
+    text-align: center;
+}
+
+.wheel {
+    display: flex;
+    justify-content: center;
+    position: relative;
+}
+
+.center-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 60px;
+    background-color: #eeeeee;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.ruleta {
+    position: relative;
+}
+
+.triangle {
+    width: 0; 
+    height: 0; 
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent; 
+    border-right: 30px solid rgba(250, 0, 0, 0.945); 
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+}
+
+textarea {
+    background-color: rgba(20, 20, 20, 0.2);
+    caret-color: #fff;
+    resize: none;
+    color: #fff;
+}
+
+.inputArea {
+    display: flex;
+    justify-content: center;
+    margin-top: 40px;
+}
+
+@media (max-width: 537px) {
+    .ruleta {
+        width: 300px;
+    }
+    .center-circle {
+        width: 4rem;
+        height: 4rem;
+    }
+}
+</style>    
+{% endblock  %}
+   
+{% block title %}
+    Ruleta de la suerte
+{% endblock title %}
+    
+{% block content %}
+<!-- Modal de Bootstrap -->
+<div class="modal fade" id="premioModal" tabindex="-1" aria-labelledby="premioModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="premioModalLabel">¡Felicidades!</h5>
+        </div>
+        <div class="modal-body">
+          <p id="mensajePremio"></p> <!-- Aquí aparecerá el premio ganado -->
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="container"></div>
+    <div class="row mb-1">
+        <div class="col-1 col-md-4 themed-grid-col"></div>
+        <div class="col-10 col-md-4 themed-grid-col">
+            <br>
+            <div class="card">
+                <form method="POST">
+                    <div class="card-header">
+                        <img src="{% static 'img/Logo_EFperfumes1.png' %}" class="img-fluid mx-auto d-block" alt="...">
+						<h5 class="card-title titulo-ruleta text-center">Ruleta de premios de EF Perfumes</h5>
+						<div class="row mb-3">
+							<div class="col-6 themed-grid-col">Tienda: {{ tienda }}</div>
+							<div class="col-6 themed-grid-col">Ticket: {{ codigo_ticket }}</div>
+						</div>
+						
+						<div class="row mb-3" >
+							<div class="col-6 themed-grid-col"><p>Premio</p></div>
+							<div class="col-6 themed-grid-col"><p id="winner" style="display: none;">&nbsp;</p></div>
+						</div> 
+                    </div>
+                    <div class="card-body">
+                        
+                        <br>
+                        <div class="wheel">
+                            <div class="ruleta">
+                                <canvas class="ruleta" id="canvas" width="500" height="500"></canvas>
+                                <div class="triangle"></div>
+                            </div>
+                            <div class="center-circle" onclick="spin()">
+                                <img src="{% static 'img/LogoLetrasEF.png' %}" alt="Logo" class="center-image logo">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+        <div class="col-1 col-md-4 themed-grid-col"></div>
+    </div>
+</div>
+<br>
+
+
+
+
+
+{% endblock content %}
+    
+
+{% block js_footer %}
+<script>
+    function mostrarPremio(premio) {
+        // Establecer el texto del premio en el modal
+        document.getElementById('mensajePremio').innerText = premio;
+        
+        // Mostrar el modal
+        var premioModal = new bootstrap.Modal(document.getElementById('premioModal'));
+        premioModal.show();
+
+        // Después de 5 segundos, enviar el formulario por POST
+        setTimeout(function() {
+        enviarDatosPremio1();
+        }, 100);  // 5000 ms = 5 segundos
+    }
+    function enviarDatosPremio1() {
+        alert('AAA')
+    }
+  // Función para enviar los datos por POST
+    function enviarDatosPremio() {
+        // Crear un formulario y enviarlo por POST
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/polls/guardar-premio/';  // Cambia esto a la URL de tu vista 'guardar_premio'
+
+        // Token CSRF (necesario para Django)
+        var csrfToken = '{{ csrf_token }}';  // Asegúrate de que el token CSRF esté disponible en la plantilla
+        var csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+
+        // Añadir datos del premio
+        var premioInput = document.createElement('input');
+        premioInput.type = 'hidden';
+        premioInput.name = 'premio';
+        premioInput.value = document.getElementById('mensajePremio').innerText;
+        form.appendChild(premioInput);
+
+        // Otros datos necesarios (e.g., codigo_ticket)
+        var codigoTicketInput = document.createElement('input');
+        codigoTicketInput.type = 'hidden';
+        codigoTicketInput.name = 'codigo_ticket';
+        codigoTicketInput.value = '{{ codigo_ticket }}';  // Asegúrate de pasar esta variable
+        form.appendChild(codigoTicketInput);
+
+        var encuesta_fijaInput = document.createElement('input');
+        encuesta_fijaInput.type = 'hidden';
+        encuesta_fijaInput.name = 'encuesta_fija';
+        encuesta_fijaInput.value = '{{ encuesta_id }}';  // Asegúrate de pasar esta variable
+        form.appendChild(encuesta_fijaInput);
+
+        var tiendaInput = document.createElement('input');
+        tiendaInput.type = 'hidden';
+        tiendaInput.name = 'tienda';
+        tiendaInput.value = '{{ tienda.id }}';  // Asegúrate de pasar esta variable
+        form.appendChild(tiendaInput);
+
+
+
+        // Agregar el formulario al DOM y enviarlo
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+
+    function hexToRgb(hex) {
+        // Remueve el carácter '#' si está presente
+        hex = hex.replace(/^#/, '');
+
+        // Convierte el valor hexadecimal a valores RGB
+        let bigint = parseInt(hex, 16);
+        let r = (bigint >> 16) & 255;
+        let g = (bigint >> 8) & 255;
+        let b = bigint & 255;
+
+        return { r, g, b };
+    }
+
+    function randomColor(){
+        // Lista de colores en formato hexadecimal
+        const colors = ['#e1253c', '#97222d', '#c54954', '#003468', '#6b96b8', '#97a1a7', '#ffffff'];
+
+        // Selecciona un color al azar de la lista
+        const randomHex = colors[Math.floor(Math.random() * colors.length)];
+
+        // Convierte el color hexadecimal a RGB
+        return hexToRgb(randomHex);
+
+
+//        r = Math.floor(Math.random() * 255);
+//        g = Math.floor(Math.random() * 255);
+//        b = Math.floor(Math.random() * 255);
+//        return {r,g,b}
+    }
+
+    function toRad(deg){
+        return deg * (Math.PI / 180.0);
+    }
+    function randomRange(min,max){
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    function easeOutSine(x) {
+        return Math.sin((x * Math.PI) / 2);
+    }
+    // get percent between 2 number
+    function getPercent(input,min,max){
+        return (((input - min) * 100) / (max - min))/100
+    }
+</script>
+<script id="premios-data" type="application/json">{{ premiosDat|safe }}</script>
+<script>
+    const canvas = document.getElementById("canvas")
+    const ctx = canvas.getContext("2d")
+    const width = document.getElementById("canvas").width
+    const height = document.getElementById("canvas").height
+
+    const centerX = width/2
+    const centerY = height/2
+    const radius = width/2
+
+    const premiosRawData = document.getElementById('premios-data').textContent;
+    let modifiedString = premiosRawData.replace(/'/g, '"');
+    const array = JSON.parse(modifiedString);
+    const premiosData = array;
+    const premios = premiosData.map(premio => premio.nombre);
+    const probabilidades = premiosData.map(premio => premio.probabilidad);
+
+
+    console.log(premios);
+    console.log(probabilidades);
+
+//    let items = document.getElementsByTagName("textarea")[0].value.split("\n");
+    let items = premios;
+
+    let currentDeg = 0
+    let step = 360/items.length
+    let colors = []
+    let itemDegs = {}
+
+    for(let i = 0 ; i < items.length + 1;i++){
+        colors.push(randomColor())
+    }
+
+    function createWheel(){
+//        items = document.getElementsByTagName("textarea")[0].value.split("\n");
+        items = premios;
+        step = 360/items.length
+        colors = []
+        for(let i = 0 ; i < items.length + 1;i++){
+            colors.push(randomColor())
+        }
+        draw()
+    }
+    draw()
+
+    function draw(){
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, toRad(0), toRad(360))
+        ctx.fillStyle = `rgb(${33},${33},${33})`
+        ctx.lineTo(centerX, centerY);
+        ctx.fill()
+
+        let startDeg = currentDeg;
+        for(let i = 0 ; i < items.length; i++, startDeg += step){
+            let endDeg = startDeg + step
+
+            color = colors[i]
+            let colorStyle = `rgb(${color.r},${color.g},${color.b})`
+
+            // Parte 1: Borde exterior (2px blanco)
+            ctx.beginPath();
+            rad = toRad(360/step);
+            ctx.arc(centerX, centerY, radius - 2, toRad(startDeg), toRad(endDeg))
+            let colorStyle2 = `rgb(${color.r - 30},${color.g - 30},${color.b - 30})`
+            ctx.fillStyle = colorStyle2;
+            ctx.lineTo(centerX, centerY);
+            ctx.fill();
+
+            // Añadir borde blanco
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Parte 2: Capa interior
+            ctx.beginPath();
+            rad = toRad(360/step);
+            ctx.arc(centerX, centerY, radius - 30, toRad(startDeg), toRad(endDeg))
+            ctx.fillStyle = colorStyle;
+            ctx.lineTo(centerX, centerY);
+            ctx.fill();
+
+            // Añadir borde blanco para la capa interior también (opcional)
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // draw text
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(toRad((startDeg + endDeg)/2));
+            ctx.textAlign = "center";
+            if(color.r > 130 || color.g > 130 || color.b > 130){
+                ctx.fillStyle = "#000";
+            }
+            else{
+                ctx.fillStyle = "#fff";
+            }
+            ctx.font = 'bold 16px Red Hat Display';
+            ctx.fillText(items[i], 130, 10);
+            ctx.restore();
+
+            itemDegs[items[i]] = 
+                {
+                "startDeg": startDeg,
+                "endDeg" : endDeg
+                }
+
+            // check winner
+            if(startDeg%360 < 360 && startDeg%360 > 270  && endDeg % 360 > 0 && endDeg%360 < 90 ){
+                document.getElementById("winner").innerHTML = items[i]
+            }
+        }
+    }
+
+
+
+    function draw2(){
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, toRad(0), toRad(360))
+        ctx.fillStyle = `rgb(${33},${33},${33})`
+        ctx.lineTo(centerX, centerY);
+        ctx.fill()
+
+        let startDeg = currentDeg;
+        for(let i = 0 ; i < items.length; i++, startDeg += step){
+            let endDeg = startDeg + step
+
+            color = colors[i]
+            let colorStyle = `rgb(${color.r},${color.g},${color.b})`
+
+            ctx.beginPath();
+            rad = toRad(360/step);
+            ctx.arc(centerX, centerY, radius - 2, toRad(startDeg), toRad(endDeg))
+            let colorStyle2 = `rgb(${color.r - 30},${color.g - 30},${color.b - 30})`
+            ctx.fillStyle = colorStyle2
+            ctx.lineTo(centerX, centerY);
+            ctx.fill()
+
+            ctx.beginPath();
+            rad = toRad(360/step);
+            ctx.arc(centerX, centerY, radius - 30, toRad(startDeg), toRad(endDeg))
+            ctx.fillStyle = colorStyle
+            ctx.lineTo(centerX, centerY);
+            ctx.fill()
+
+            // draw text
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(toRad((startDeg + endDeg)/2));
+            ctx.textAlign = "center";
+            if(color.r > 130 || color.g > 130 || color.b > 130){
+                ctx.fillStyle = "#000";
+            }
+            else{
+                ctx.fillStyle = "#fff";
+            }
+            ctx.font = 'bold 16px Red Hat Display';
+            ctx.fillText(items[i], 130, 10);
+            ctx.restore();
+
+            itemDegs[items[i]] = 
+                {
+                "startDeg": startDeg,
+                "endDeg" : endDeg
+                }
+            
+
+            // check winner
+            if(startDeg%360 < 360 && startDeg%360 > 270  && endDeg % 360 > 0 && endDeg%360 < 90 ){
+                document.getElementById("winner").innerHTML = items[i]
+            }
+        }
+//        console.log("itemDegs");
+//        console.log(itemDegs);
+    }
+    
+
+    let speed = 0
+    let maxRotation = randomRange(360* 3, 360 * 6)
+    let pause = false
+
+    function animate(){
+        if(pause){
+            return
+        }
+        speed = easeOutSine(getPercent(currentDeg ,maxRotation ,0)) * 20
+        if(speed < 0.01){
+            speed = 0
+            pause = true
+            const ganador = document.getElementById("winner").innerHTML;
+            mostrarPremio(ganador);
+//            enviarDatosPremio();
+        }
+        currentDeg += speed
+        draw()
+        window.requestAnimationFrame(animate);
+    }
+    
+    function spin(){
+        if(speed != 0){
+            return
+        }
+        document.getElementById("winner").style.display = "block";
+
+        maxRotation = 0;
+        currentDeg = 0
+        createWheel()
+        draw();
+
+        let premioUser = selectPrize(premios, probabilidades);
+        console.log("premio");
+        console.log(premioUser);
+        maxRotation = (360 * 5) - itemDegs[premioUser].endDeg + 10
+        itemDegs = {}
+        pause = false
+        window.requestAnimationFrame(animate);
+    }
+
+    function selectPrize(premios, probabilidades) {
+        // Asegúrate de que la longitud de ambos arrays coincida
+        if (premios.length !== probabilidades.length) {
+            throw new Error("Las longitudes de premios y probabilidades deben ser iguales.");
+        }
+
+        // Calcula la suma total de las probabilidades
+        const totalProbability = probabilidades.reduce((a, b) => a + b, 0);
+        console.log(totalProbability);
+        // Genera un número aleatorio entre 0 y totalProbability
+        const random = Math.random() * totalProbability;
+
+        // Calcula el rango acumulado de probabilidades
+        let accumulated = 0;
+
+        // Recorre las probabilidades y determina en qué rango cae el número aleatorio
+        for (let i = 0; i < probabilidades.length; i++) {
+            accumulated += probabilidades[i];
+            if (random < accumulated) {
+                return premios[i];
+            }
+        }
+    }
+</script>
+{% endblock %}

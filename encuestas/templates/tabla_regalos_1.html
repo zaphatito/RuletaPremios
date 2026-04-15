@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block header %}
+<style>
+    body {
+        background-color: #003468 !important;
+       /* background-image: url("{% static 'img/fondoruleta.png' %}");*/
+        background-repeat: repeat;
+        font-family: "Montserrat", sans-serif !important;
+        color: #eeeeee !important;
+    }
+
+    .card {
+        /* Fondo blanco con un 80% de opacidad (20% de transparencia) */
+        background-color: rgba(0, 0, 0, 0) !important;
+        
+       /* background-color: none !important;*/
+    }
+
+    .card-borde-personalizado,
+    .card-borde-personalizado .card-header,
+    .card-borde-personalizado .card-footer {
+        border-color: none ; /* O el color que prefieras */
+        border: 0px solid rgba(0, 0, 0, .125) !important;
+        background-color: rgba(0, 0, 0, 0) !important;
+    }
+    .juego-contenedor {
+        max-width: 450px;
+        margin: 20px auto;
+        padding: 20px 30px;
+        background-color: white;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        text-align: center;
+    }
+    h1 {
+        color: #1a73e8;
+        font-weight: 700;
+    }
+    .regalos-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin: 30px 0;
+    }
+    .celda-regalo {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border: 2px dashed #d0d0d0;
+        border-radius: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        background-color: #f9f9f9;
+        transition: transform 0.2s, box-shadow 0.2s;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+    .celda-regalo:not(.seleccionada):hover {
+        transform: scale(1.05);
+        border-color: #1a73e8;
+    }
+    .celda-regalo svg {
+        width: 100%;
+        height: 100%;
+    }
+    .celda-regalo.seleccionada {
+        cursor: not-allowed;
+        border-style: solid;
+        border-color: #b0b0b0;
+        background-color: #e9ecef;
+    }
+    #mensaje-animo, #resultado-premio {
+        min-height: 25px;
+        margin-top: 15px;
+        font-size: 1.1em;
+        font-weight: 600;
+    }
+    #mensaje-animo { color: #e67e22; }
+    #resultado-premio { color: #27ae60; font-size: 1.3em; }
+</style>
+{% endblock header %}
+
+{% block title %}Juego de Regalos{% endblock title %}
+
+{% block content %}
+<div class="juego-contenedor">
+    <h1>¡Elige un Regalo!</h1>
+    <p>Tienes hasta 3 intentos para encontrar tu premio.</p>
+
+    <div class="regalos-grid">
+        {% for i in rango_celdas %}
+        <div class="celda-regalo">
+            <svg viewBox="0 0 100 100" class="imagen-regalo">
+                <rect x="10" y="40" width="80" height="50" rx="5" fill="#D32F2F"/>
+                <rect x="42" y="15" width="16" height="75" fill="#FFC107"/>
+                <rect x="10" y="52" width="80" height="16" fill="#FFC107"/>
+                <path d="M 50 15 A 15 15 0 0 1 65 30 L 60 30 A 10 10 0 0 0 50 20 Z" fill="#FFC107"/>
+                <path d="M 50 15 A 15 15 0 0 0 35 30 L 40 30 A 10 10 0 0 1 50 20 Z" fill="#FFC107"/>
+            </svg>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div id="mensaje-animo"></div>
+    <div id="resultado-premio"></div>
+</div>
+
+<div id="svg-templates" style="display: none;">
+    <div id="template-fallo">
+        <svg viewBox="0 0 100 100">
+            <rect x="10" y="50" width="80" height="40" rx="5" fill="#A1887F"/>
+            <path d="M 8 50 L 25 20 L 75 20 L 92 50 Z" fill="#D2B48C" stroke="#A1887F" stroke-width="2"/>
+            <path d="M 50 20 L 40 50 L 60 50 Z" fill="#D2B48C"/>
+            <line x1="50" y1="20" x2="50" y2="50" stroke="#A1887F" stroke-width="2"/>
+        </svg>
+    </div>
+    <div id="template-premio">
+        <svg viewBox="0 0 100 100">
+            <path d="M 25 90 H 75 V 80 H 25 Z" fill="#FFC107"/>
+            <path d="M 45 80 V 50 H 55 V 80 Z" fill="#FFC107"/>
+            <path d="M 50 50 C 75 50 75 20 50 20 C 25 20 25 50 50 50 Z" fill="#FFD54F"/>
+            <path d="M 25 35 C 15 35 15 50 25 50" fill="none" stroke="#FFC107" stroke-width="8" stroke-linecap="round"/>
+            <path d="M 75 35 C 85 35 85 50 75 50" fill="none" stroke="#FFC107" stroke-width="8" stroke-linecap="round"/>
+            <text x="50" y="40" font-family="Arial, sans-serif" font-size="20" fill="#C68F00" text-anchor="middle" font-weight="bold">★</text>
+        </svg>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const celdasRegalo = document.querySelectorAll('.celda-regalo');
+        const mensajeAnimoEl = document.getElementById('mensaje-animo');
+        const resultadoPremioEl = document.getElementById('resultado-premio');
+
+        const svgFallo = document.getElementById('template-fallo').innerHTML;
+        const svgPremio = document.getElementById('template-premio').innerHTML;
+
+        // ====================================================================
+        // DATOS QUE LA VISTA DE DJANGO DEBE PASAR A LA PLANTILLA
+        // ====================================================================
+        const intentoGanador = parseInt("{{ intento_ganador|default:1 }}", 10);
+        const premioObtenido = "{{ premio_obtenido|escapejs }}";
+        // ====================================================================
+
+        let intentosRealizados = 0;
+        let juegoTerminado = false;
+
+        const mensajesAnimo = [
+            "¡Uy, aquí no era! ¡Sigue buscando, estás más cerca!",
+            "¡Casi lo tienes! ¡El próximo es el de la suerte!"
+        ];
+
+        celdasRegalo.forEach(celda => {
+            celda.addEventListener('click', () => {
+                if (juegoTerminado || celda.classList.contains('seleccionada')) {
+                    return;
+                }
+
+                celda.classList.add('seleccionada');
+                intentosRealizados++;
+
+                if (intentosRealizados === intentoGanador) {
+                    // ¡GANÓ!
+                    juegoTerminado = true;
+                    mensajeAnimoEl.textContent = '';
+                    resultadoPremioEl.textContent = `¡Felicidades! Has ganado: ${premioObtenido}`;
+                    
+                    celda.innerHTML = svgPremio; // Reemplaza el contenido con el SVG del trofeo
+                    
+                    celdasRegalo.forEach(c => {
+                        if (!c.classList.contains('seleccionada')) {
+                           c.classList.add('seleccionada'); // Bloquea las celdas restantes
+                        }
+                    });
+
+                } else {
+                    // INTENTO FALLIDO
+                    celda.innerHTML = svgFallo; // Reemplaza el contenido con el SVG de la caja vacía
+                    
+                    if (intentosRealizados < 3) {
+                        mensajeAnimoEl.textContent = mensajesAnimo[intentosRealizados - 1];
+                    } else {
+                         juegoTerminado = true;
+                         resultadoPremioEl.textContent = '¡Oh! Mejor suerte para la próxima.';
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock content %}

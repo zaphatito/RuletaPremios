@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+{% block header %}  
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        background-color: #003468 !important;
+       /* background-image: url("{% static 'img/fondoruleta.png' %}");*/
+        background-repeat: repeat;
+        font-family: "Montserrat", sans-serif !important;
+        color: #eeeeee !important;
+    }
+
+    p {
+        margin-bottom: 0px !important;
+    }
+    span {
+        color: #c9c9c9 !important;
+        font-size: smaller;
+    }
+    .card {
+        /* Fondo blanco con un 80% de opacidad (20% de transparencia) */
+        background-color: rgba(0, 0, 0, 0) !important;
+        
+       /* background-color: none !important;*/
+    }
+
+    .card-borde-personalizado,
+    .card-borde-personalizado .card-header,
+    .card-borde-personalizado .card-footer {
+        border-color: none ; /* O el color que prefieras */
+        border: 0px solid rgba(0, 0, 0, .125) !important;
+        background-color: rgba(0, 0, 0, 0) !important;
+    }
+
+    .imagen-premio {
+        max-height: 250px;       /* Alto máximo */
+        max-width: 250px;        /* Ancho máximo */
+        object-fit: cover;      /* Evita que la imagen se deforme */
+        display: block;         /* Ayuda a centrarla con margin */
+        margin: 1rem auto;      /* 1rem de espacio arriba/abajo y la centra horizontalmente */
+    }
+
+    
+    .header {
+        padding: 40px;
+        color: #fff;
+        margin: 0 auto;
+        margin-bottom: 40px;
+    }
+    
+    .header h1,p {
+        text-align: center;
+    }
+    
+    textarea {
+        background-color: rgba(20, 20, 20, 0.2);
+        caret-color: #fff;
+        resize: none;
+        color: #fff;
+    }
+    
+    
+</style>
+
+
+{% endblock %}
+
+
+{% block title %}
+Premio entregado
+{% endblock title %}
+
+
+{% block content %}
+<title></title>
+
+
+
+<div class="container"></div>
+    <div class="row mb-1">
+        <div class="col-1 col-md-4 themed-grid-col"></div>
+        <div class="col-10 col-md-4 themed-grid-col">
+            <br>
+            <div class="card card-borde-personalizado">
+                <form method="POST">
+                    <div class="card-header">
+                        <img src="{% static 'images/felicidades.png' %}" class="img-fluid mx-auto d-block" alt="...">
+                    </div>
+                    <div class="card-body text-center">
+                        {% if premio.premio.imagen %}
+                            <img src="{{ premio.premio.imagen.url }}" alt="Imagen de {{ premio.premio.nombre }}" class="img-fluid imagen-premio">
+                        {% endif %}
+                        <br>
+                        <h1>{{ premio.premio }}</h1>
+                        <span>{{ premio.premio.descripcion }}</span>
+                        <h2>{{ premio.nombre }} {{ premio.apellidos }}</h2>
+                        <p>Identificación: {{ premio.DNI }}</p>
+                        <p>Ticket: {{ premio.codigo_ticket }}</p>
+                        <p>Presenta el ticket de compra junto a este mensaje para reclamar el premio.</p>
+
+
+                    </div>
+                </form>
+            </div>
+
+        </div>
+        <div class="col-1 col-md-4 themed-grid-col"></div>
+    </div>
+</div>
+<br>
+
+
+
+
+
+
+
+
+
+
+
+
+{% endblock content %}
+   
+
+{% block js_footer %}
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script>
+    // Lanza los fuegos artificiales cuando la página se carga
+    window.onload = function() {
+        lanzarFuegosArtificiales();
+    };
+
+// Simula fuegos artificiales
+    function lanzarFuegosArtificiales() {
+    var duration = 2 * 1000; // El efecto durará 2 segundos
+    var animationEnd = Date.now() + duration;
+    var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+    function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
+    var interval = setInterval(function() {
+        var timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+        return clearInterval(interval);
+        }
+
+        var particleCount = 50 * (timeLeft / duration);
+        // Lanza las partículas desde dos puntos para un efecto más lleno
+        confetti(Object.assign({}, defaults, { 
+            particleCount, 
+            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+            shapes: ['circle'], // ¡CLAVE! Usa círculos en vez de rectángulos
+            colors: ['#ffc107', '#ffca2c', '#ffffff', '#ff9800'] // Colores de fuego/dorado
+        }));
+        confetti(Object.assign({}, defaults, { 
+            particleCount, 
+            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+            shapes: ['circle'], // ¡CLAVE! Usa círculos en vez de rectángulos
+            colors: ['#ffc107', '#ffca2c', '#ffffff', '#ff9800'] // Colores de fuego/dorado
+        }));
+    }, 250);
+    }
+
+</script>
+
+{% endblock  %}
+
+

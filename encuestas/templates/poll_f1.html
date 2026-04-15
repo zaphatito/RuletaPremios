@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block header %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap" rel="stylesheet">
+<style>
+body {
+    background-color: #eeeeee;
+    /*background-image: url("{% static 'img/fondoruleta.png' %}");*/
+    background-repeat: repeat repeat;
+
+    text-align: start; 
+    transition-property: opacity, transform; 
+    font-family: 'Red Hat Display' !important; 
+    font-style: normal; 
+    font-stretch: normal; 
+    font-optical-sizing: auto; 
+    line-height: initial; 
+    opacity: 1; 
+    transition-duration: 350ms;
+}
+
+/* CSS para las valoraciones con estrellas */
+.star-rating {
+    display: flex;
+    flex-direction: row-reverse; /* Importante para el efecto hover */
+    justify-content: center;
+    margin: 10px 0;
+    gap: 5px;
+}
+.star-rating input[type="radio"] {
+    display: none; /* Ocultamos los radio buttons originales */
+}
+.star-rating label {
+    font-size: 2.5rem; /* Tamaño de las estrellas */
+    color: #ddd; /* Color de estrella inactiva */
+    cursor: pointer;
+    transition: color 0.2s;
+    line-height: 1;
+}
+/* Efecto hover: colorea las estrellas al pasar el mouse */
+.star-rating label:hover,
+.star-rating label:hover ~ label {
+/*    color: #f5b301;*/
+    color: #003468;
+}
+/* Estilo para la estrella seleccionada y las anteriores */
+.star-rating input[type="radio"]:checked ~ label {
+    color: #003468;
+}
+
+
+
+
+.label-ruleta {
+    font-size: 16px;
+    font-weight: 600; 
+}
+
+.desc-ruleta {
+    font-size: 12px;
+    font-weight: 400; 
+}
+
+
+.titulo-ruleta {
+    font-size: 20px;
+    font-weight: 600; 
+}
+
+.hidden {
+    display: none;
+}
+
+.slider-container {
+    margin: 20px 0;
+    text-align: center;
+    width: 100%;
+}
+
+
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+    align-items: center; /* Centra las imágenes verticalmente */
+    gap: 10px; /* Añade una separación entre las imágenes */
+    max-width: 100%; /* Asegúrate de que no se exceda el ancho del contenedor */
+}
+
+.slider-labels img {
+    height: auto; /* Mantén la proporción original de las imágenes */
+    flex-shrink: 0; /* Evita que las imágenes se encojan más allá de su tamaño natural */
+    width: 30%;
+    /*height: 30px;*/
+}
+
+
+.slider-value {
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+input[type="range"] {
+    width: 100%; /* Hacer que el slider ocupe el 100% */
+}
+
+.selected-icon {
+    border: 8px solid hsl(54, 97%, 58%);  /* Un borde más grueso */
+    border-radius: 50%;      /* Esto hace que el borde sea redondeado */
+    box-shadow: 0 0 10px rgba(247, 224, 174, 0.5); /* Añade una sombra para dar más énfasis */
+    transition: border 0.3s ease; /* Transición suave para el cambio de borde */
+
+}
+
+
+@media (min-width: 900px) {
+    .container-fluid {
+        width: 500px !important;
+    }
+}
+@media (max-width: 537px) {
+    .label-ruleta {
+        font-size: 14px;
+        font-weight: 600; 
+    }
+    .form-control {
+        font-size: 12px !important;
+    }
+}
+
+
+
+</style>    
+{% endblock  %}
+
+{% block title %}
+    Polls
+{% endblock title %}
+    Polls
+{% block content %}
+
+<!-- Modal HTML -->
+<div class="modal fade" id="privacyModal" tabindex="-1" aria-labelledby="privacyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="privacyModalLabel">Términos y Condiciones</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" style="font-size: x-small;">
+          <p><strong>Términos y Condiciones</strong></p>
+            <p>a)	Mecánica:</p>
+            <p>     Para poder participar de la ruleta digital, debes seguir los siguientes pasos:</p>
+            <p>      *	Realizar una compra sin monto mínimo de compra en cualquiera de nuestros módulos a nivel nacional.</p>
+            <p>      *	Escanear el QR que se encuentra en el voucher/ comprobante de compra.</p>
+            <p>      *	Llenar el formulario solicitado.</p>
+            <p>      *	Presionar la ruleta por única vez</p>
+            <p>      *	Canjear inmediatamente tu regalo mostrándole la captura de pantalla al vendedor en el módulo.</p>
+            <p>b)	Premios:</p>
+            <p>     🔸  Sobre los bolígrafos:</p>
+            <p>     Vienen en diferentes colores que se entregará al azar según disponibilidad.</p>
+            <p>     🔸  Sobre los llaveros:</p>
+            <p>     Vienen en diferentes colores que se entregará al azar según disponibilidad.</p>
+            <p>     🔸  Sobre los perfumes de 15ml:</p>
+            <p>     Un perfume de 15ml en fragancia seleccionada según disponibilidad de stock de cada tienda.</p>
+            <p>     🔸  Sobre los perfumes de 50ml:</p>
+            <p>     Un perfume de 50ml en fragancia seleccionada según disponibilidad de stock de cada tienda.</p>
+            <p>     🔸  Sobre la tarjeta de descuento:</p>
+            <p>     Obtén un 20% de descuento en un perfume de 100 ml en la próxima compra. Para canjear la tarjeta, el cliente debe presentarla al momento de la compra. No es acumulable. No se puede combinar con otras promociones.</p>
+            <p>     🔸  Sobre los charms:</p>
+            <p>     Vienen en diferentes colores y se entregan 2 modelos al azar.</p>
+            <p>c)	Vigencia: Válido del 01 de septiembre hasta el 30 de septiembre del 2025</p>
+            <p>d)	Territorio: Válido para personas mayores de 18 años residentes en las diferentes ciudades de Perú.</p>
+            <p>e)	Restricciones:</p>
+            <p>     -	Válido 1 participación por ticket de compra.</p>
+            <p>     -	No se permiten cambios ni devoluciones del presente regalado.</p>
+            <p>     -	Premios y/o regalos sujetos a stock.</p>
+            <p>     -	Los clientes que brinden datos falsos no serán considerados para la entrega de los premios.</p>
+            <p>     -	La participación implica el conocimiento y aceptación expresa de los términos y condiciones aquí expuestos.</p>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+</div>
+  
+
+<div class="container-fluid p-0">
+    <form method="POST" id="myform">
+        <div class="p-3 text-center" style="background-color: #6b96b8;">
+            <br>
+            <img src="{% static 'images/Logo EF Blanco.svg' %}" class="img-fluid" alt="..." style="width: 30%;">
+            <br><br>
+        </div>
+
+        <div class="p-3">
+            <h3 class="text-center">¡ Tu reseña tiene Premio !</h3>
+            <p class="desc-ruleta text-center">Tu opinión es el ingrediente secreto para que nuestros perfumes sean aún más top. Compártenos tu experiencia y ayúdanos a seguir creando fragancias que te empoderen.</p>
+            <p class="desc-ruleta text-center">Llena esta pequeña reseña, y al final,<br><span class="fw-bold text-center">¡participa en nuestro juego de Premios!</span></p>
+            
+            {% csrf_token %}
+            <div class="form-group">
+                {% if form.errors %}
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <strong>Atención !</strong>
+                    <ul>
+                        {% for field in form %}
+                            {% if field.errors %}
+                                <li><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</li>
+                            {% endif %}
+                        {% endfor %}
+                        {% if form.non_field_errors %}
+                            <li>{{ form.non_field_errors|striptags }}</li>
+                        {% endif %}
+                    </ul>                                    
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+                
+                <div class="row mb-3 align-items-center"> <div class="col-3"><label for="id_codigo_ticket" class="label-ruleta" >{{ form.codigo_ticket.label }}</label></div>
+                    <div class="col-9">
+                        {{ form.codigo_ticket }}
+                        <span style="font-size: 60%;">{{ form.codigo_ticket.help_text }}</span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    {{ form.nombre }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.apellidos }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.telefono }}
+                    <span style="font-size: 60%;">{{ form.telefono.help_text }}</span>
+                </div>
+
+
+                <div class="row mb-3 align-items-center">
+                    <div class="col-6"><label for="id_fnac" class="label-ruleta">{{ form.fnac.label }}</label></div>
+                    <div class="col-6">{{ form.fnac }}</div>
+                </div>
+
+                <div class="mb-3">
+                    {{ form.correo }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.DNI }}
+                    <span style="font-size: 60%;">{{ form.DNI.help_text }}</span>
+                </div>
+
+                
+                <div class="mb-3 text-center">
+                    <br>
+                    <label class="label-ruleta">{{ form.valoracion_producto.label }}</label>
+                    <img src="{% static 'images/Botella50ml.png' %}" class="img-fluid mx-auto d-block" alt="..." style="width: 50%;">
+                    <div class="star-rating">
+                        {% for radio in form.valoracion_producto %}
+                            {{ radio.tag }}
+                            <label for="{{ radio.id_for_label }}">☆</label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-3 text-center">
+                    <label class="label-ruleta">{{ form.valoracion_atencion.label }}</label>
+                    <div class="star-rating">
+                        {% for radio in form.valoracion_atencion %}
+                            {{ radio.tag }}
+                            <label for="{{ radio.id_for_label }}">☆</label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-3 text-center">
+                    <label class="label-ruleta">{{ form.probabilidad_recomendacion.label }}</label>
+                    <div class="star-rating">
+                        {% for radio in form.probabilidad_recomendacion %}
+                            {{ radio.tag }}
+                            <label for="{{ radio.id_for_label }}">☆</label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-3 text-center">
+                    <label for="id_comentarios_adicionales" class="label-ruleta" style="color: #003468;" >{{ form.comentarios_adicionales.label }}</label>
+                    {{ form.comentarios_adicionales }}
+                </div>
+
+                <div class="row align-items-center">
+                    <div class="col-1">{{ form.acepPolPriv }}</div>
+                    <div class="col-11"><span style="font-size: 10px;">{{ form.acepPolPriv.label_tag }}</span></div>
+                </div>
+
+                <div class="row mb-3 align-items-center">
+                    <div class="col-1">{{ form.acepProm }}</div>
+                    <div class="col-11"><span style="font-size: 10px;">{{ form.acepProm.label }}</span></div>
+                </div>
+
+                <p id="mensajeError" style="color: red; display: none;">Por favor, complete todas las valoraciones antes de enviar.</p>
+            </div>
+        </div> 
+        
+        <div class="p-3 text-center">
+            <button type="submit" class="btn btn-primary" style="background-color: #6b96b8; color: white;">Enviar y Jugar</button>
+        </div>
+    </form>
+    <br>
+
+    <script>
+        document.getElementById('myform').addEventListener('submit', function(event) {
+            // Obtenemos los valores de los 3 grupos de radio buttons
+            const prod_checked = document.querySelector('input[name="valoracion_producto"]:checked');
+            const aten_checked = document.querySelector('input[name="valoracion_atencion"]:checked');
+            const reco_checked = document.querySelector('input[name="probabilidad_recomendacion"]:checked');
+            
+            // Si alguno de los 3 no ha sido seleccionado, prevenimos el envío del formulario
+            if (!prod_checked || !aten_checked || !reco_checked) {
+                event.preventDefault(); // Detiene el envío
+                document.getElementById('mensajeError').style.display = 'block'; // Muestra el mensaje de error
+            } else {
+                document.getElementById('mensajeError').style.display = 'none'; // Oculta el mensaje si todo está OK
+            }
+        });
+    </script>
+</div>
+<script src="https://unpkg.com/imask"></script>
+<script>
+    // Se ejecuta cuando la página ha cargado completamente
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Seleccionamos el campo de fecha por su ID (Django lo genera como id_fnac)
+        var dateInput = document.getElementById('id_fnac');
+        
+        // 2. Definimos las opciones de la máscara
+        var dateMaskOptions = {
+            mask: 'd/`m`/`Y`', // El patrón de la máscara
+            blocks: {
+                d: {
+                    mask: IMask.MaskedRange,
+                    from: 1,
+                    to: 31,
+                    maxLength: 2,
+                },
+                m: {
+                    mask: IMask.MaskedRange,
+                    from: 1,
+                    to: 12,
+                    maxLength: 2,
+                },
+                Y: {
+                    mask: IMask.MaskedRange,
+                    from: 1920,
+                    to: 2025, // O el año máximo que quieras permitir
+                }
+            },
+            // Formatea la fecha mientras se escribe
+            lazy: false
+        };
+        
+        // 3. Creamos la máscara en el campo de fecha
+        var mask = IMask(dateInput, dateMaskOptions);
+    });
+</script>
+{% endblock content %}
+    

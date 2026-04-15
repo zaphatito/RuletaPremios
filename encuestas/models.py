@@ -1,0 +1,522 @@
+import random
+from datetime import date
+from django.utils import timezone
+from django.urls import reverse
+from decimal import Decimal
+from django.db import models
+from django.utils.html import format_html
+
+
+class Pais(models.Model):
+    nombre = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name = "País"
+        verbose_name_plural = "Paises"
+
+    def __str__(self):
+        return self.nombre
+
+class Region(models.Model):
+    nombre = models.CharField(max_length=100)
+    pais = models.ForeignKey(Pais, on_delete=models.CASCADE, related_name='regiones')
+
+    class Meta:
+        verbose_name = "Región"
+        verbose_name_plural = "Regiones"
+        
+    def __str__(self):
+        return f'{self.nombre} - {self.pais.nombre}'
+    
+class Tienda(models.Model):
+    nombre = models.CharField(max_length=255)
+    pais = models.ForeignKey(Pais, on_delete=models.CASCADE, related_name='tiendas')
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='tiendas', null=True, blank=True)
+    activa = models.BooleanField(default=True)
+    id_efsystem = models.DecimalField(null=True, blank=True, max_digits=3, decimal_places=0)
+    """  Campo para validar premio para ruleta
+    """
+    monto_minimo_promociones = models.DecimalField(
+        "Monto mínimo para habilitar promociones",
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    requiere_validacion_ticket = models.BooleanField(
+        "¿Requiere validación de ticket online?",
+        default=False,
+        help_text="Marcar si esta tienda (ej. Tienda Online) debe validar el ticket contra la tabla de Ventas en Línea."
+    )
+
+    def __str__(self):
+        return self.nombre
+
+
+    def __str__(self):
+        return self.nombre
+
+    def encuestasFijas_asignadas(self):
+        return ', '.join([encuesta_fija.titulo for encuesta_fija in self.encuestasfijas.all()])
+
+    def encuestasFijas_asignadas_id(self):
+        return ', '.join([f'{encuesta_fija.id}' for encuesta_fija in self.encuestasfijas.all()])
+    
+    def premios_stock(self):
+        """
+        Retorna la cantidad total de premios en stock para esta tienda.
+        Suma el campo 'cantidad' de todos los objetos relacionados en TiendaPremio.
+        """
+        return sum(tp.cantidad for tp in self.tienda_premios.all())
+    
+    def permite_premios_para(self, monto: Decimal) -> bool:
+        """
+        Devuelve True si el monto cumple el mínimo para esta tienda.
+        """
+        return monto >= self.monto_minimo_promociones
+
+
+class TicketConsulta(models.Model):
+    tienda    = models.ForeignKey(Tienda, on_delete=models.CASCADE)
+    codigo    = models.CharField(max_length=255)
+    monto     = models.DecimalField(max_digits=10, decimal_places=2)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+
+
+class Pregunta(models.Model):
+    TIPO_PREGUNTA = (
+        ('texto', 'Texto'),
+        ('numerico', 'Numérico'),
+        ('seleccion_simple', 'Selección Simple'),
+    )
+    
+    texto = models.CharField(max_length=255)
+    tipo_de_pregunta = models.CharField(max_length=20, choices=TIPO_PREGUNTA)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.texto
+
+class Opcion(models.Model):
+    texto_de_opcion = models.CharField(max_length=255)
+    valor_numerico = models.DecimalField(max_digits=10, decimal_places=0, default=1)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Opción"
+        verbose_name_plural = "Opciones"
+
+    def __str__(self):
+        return f'{self.texto_de_opcion} (Valor: {self.valor_numerico})'
+
+class PreguntaOpcion(models.Model):
+    pregunta = models.ForeignKey(Pregunta, on_delete=models.CASCADE, related_name='pregunta_opciones')
+    opcion = models.ForeignKey(Opcion, on_delete=models.CASCADE, related_name='pregunta_opciones')
+    orden = models.PositiveIntegerField()
+
+    class Meta:
+        verbose_name = "Opción de Pregunta"
+        verbose_name_plural = "Opciones de Preguntas"
+        unique_together = ('pregunta', 'opcion')
+        ordering = ['orden']
+
+    def __str__(self):
+        return f'Opción {self.opcion.texto_de_opcion} en Pregunta {self.pregunta.texto}'
+
+class Encuesta(models.Model):
+    titulo = models.CharField(max_length=255)
+    descripcion = models.TextField()
+    activa = models.BooleanField(default=True)
+    tiendas = models.ManyToManyField(Tienda, related_name='encuestas', blank=True)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='encuestas', null=True, blank=True)
+    pais = models.ForeignKey(Pais, on_delete=models.CASCADE, related_name='encuestas', null=True, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.titulo
+    
+    def save(self, *args, **kwargs):
+        # Lógica de prioridad
+        if self.tiendas.exists():
+            self.region = None
+            self.pais = None
+        elif self.region:
+            self.pais = None
+        super().save(*args, **kwargs)
+
+    def get_tiendas_asignadas(self):
+        """
+        Devuelve un queryset con las tiendas a las que se aplica la encuesta.
+        Prioridad:
+        1. Si tiene tiendas asignadas, devolver esas tiendas.
+        2. Si tiene una región asignada, devolver las tiendas de esa región.
+        3. Si tiene un país asignado, devolver las tiendas de ese país.
+        """
+        if self.tiendas.exists():
+            return self.tiendas.all()  # Tiendas asignadas directamente
+        elif self.region:
+            return Tienda.objects.filter(region=self.region)  # Tiendas de la región asignada
+        elif self.pais:
+            return Tienda.objects.filter(pais=self.pais)  # Tiendas del país asignado
+        else:
+            return Tienda.objects.none()  # No hay tiendas asignadas
+
+
+class EncuestaPregunta(models.Model):
+    encuesta = models.ForeignKey(Encuesta, on_delete=models.CASCADE, related_name='encuesta_preguntas')
+    pregunta = models.ForeignKey(Pregunta, on_delete=models.CASCADE, related_name='encuestas')
+    orden = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ('encuesta', 'pregunta')
+        ordering = ['orden']
+
+    def __str__(self):
+        return f'Pregunta {self.pregunta.texto} en Encuesta {self.encuesta.titulo}'
+
+class Respuesta(models.Model):
+    encuesta = models.ForeignKey(Encuesta, on_delete=models.CASCADE, related_name='respuestas')
+    pregunta = models.ForeignKey(Pregunta, on_delete=models.CASCADE, related_name='respuestas')
+    codigo_ticket = models.CharField(max_length=255)
+    texto_de_respuesta = models.TextField(null=True, blank=True)
+    opcion = models.ForeignKey(Opcion, on_delete=models.CASCADE, related_name='respuestas', null=True, blank=True)
+    tienda = models.ForeignKey(Tienda, on_delete=models.CASCADE, related_name='respuestas')
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Respuesta {self.codigo_ticket} - Pregunta: {self.pregunta.texto}'
+
+class Premio(models.Model):
+    nombre = models.CharField(max_length=255, unique=True)
+    descripcion = models.TextField(null=True, blank=True)
+
+    # --- CAMBIO AQUÍ: AÑADIR EL CAMPO DE IMAGEN ---
+    imagen = models.ImageField(
+        upload_to='premios/',  # Guarda las imágenes en la carpeta 'media/premios/'
+        null=True,
+        blank=True,
+        verbose_name="Imagen del Producto"
+    )
+
+    class Meta:
+        verbose_name = "Premio"
+        verbose_name_plural = "Premios"
+
+    def __str__(self):
+        return self.nombre
+
+
+class TiendaPremio(models.Model):
+    tienda = models.ForeignKey(Tienda, on_delete=models.CASCADE, related_name='tienda_premios')
+    premio = models.ForeignKey(Premio, on_delete=models.CASCADE, related_name='premios_tienda')
+    cantidad = models.PositiveIntegerField()
+    monto_minimo_premio = models.DecimalField(
+        "Monto mínimo para premio",
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    visible = models.BooleanField(default=False, verbose_name="Visible en lista de premios")
+    orden = models.PositiveIntegerField(
+        default=0,
+        blank=False,
+        null=False,
+        db_index=True  # Indexar para mejorar el rendimiento de la ordenación
+    )
+
+
+    class Meta:
+        ordering = ['orden']
+        verbose_name = "Premio de tienda"
+        verbose_name_plural = "Premios de tienda"
+        unique_together = ('tienda', 'premio')
+
+    def __str__(self):
+        return f'{self.tienda.nombre} - {self.premio.nombre} (Cantidad: {self.cantidad})'
+
+
+    def obtener_premios_y_probabilidades(self, monto: Decimal):
+        """
+        Obtiene los premios disponibles y sus probabilidades basadas en el stock.
+        """
+        premios_qs = self.tienda_premios.all()
+        cantidades = [
+            tp.stock_disponible(monto)
+            for tp in premios_qs
+        ]
+        """ total_stock = sum(premio.cantidad for premio in premios) """
+        total_stock = sum(cantidades)
+
+        if total_stock <= 0:
+            return []
+        
+        
+        # 4) construimos la lista de (Premio, probabilidad)
+        resultados = []
+        for tp, c in zip(premios_qs, cantidades):
+            prob = (c / total_stock) if c > 0 else 0
+            resultados.append((tp.premio, prob))        
+        
+        return resultados
+        
+        """
+        premios_y_probabilidades = [
+            (premio.premio, premio.cantidad / total_stock) for premio in premios 
+        ]
+        return premios_y_probabilidades """
+
+    def sortear_premio(self, monto: Decimal):
+        """
+        Realiza un sorteo basado en las probabilidades y reduce el stock del premio seleccionado.
+        """
+        premios_y_probabilidades = self.obtener_premios_y_probabilidades(monto)
+        if not premios_y_probabilidades:
+            raise ValueError("No hay premios disponibles para sortear.")
+
+        premios, probabilidades = zip(*premios_y_probabilidades)
+        premio_seleccionado = random.choices(premios, weights=probabilidades, k=1)[0]
+        
+        # Reducir el stock del premio seleccionado
+        tienda_premio = self.tienda_premios.get(premio=premio_seleccionado)
+        if tienda_premio.cantidad > 0:
+            tienda_premio.cantidad -= 1
+            tienda_premio.save()
+        else:
+            raise ValueError("El premio seleccionado está agotado.")
+        
+        return premio_seleccionado
+
+    def stock_disponible(self, monto: Decimal) -> int:
+        """
+        Si el monto no alcanza el mínimo para este premio, devuelve 0,
+        en caso contrario la cantidad real.
+        """
+        if monto < self.monto_minimo_premio:
+            return 0
+        return self.cantidad
+
+class FormularioEncFija(models.Model):
+    nombre = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name = "Form Encuesta Fija"
+        verbose_name_plural = "Form Encuestas Fijas"
+
+    def __str__(self):
+        return self.nombre
+
+class EncuestaFija(models.Model):
+    class TipoJuego(models.TextChoices):
+        RULETA = 'RULETA', 'Ruleta de Premios'
+        CAJAS = 'CAJAS', 'Cajas de Regalos'
+
+    titulo = models.CharField(max_length=255)
+    descripcion = models.TextField()
+    activa = models.BooleanField(default=True)
+    encuestafija = models.ForeignKey(FormularioEncFija, on_delete=models.CASCADE, related_name='encuestasfijas', null=True, blank=True, verbose_name='Encuesta Fija' )
+    tipo_juego = models.CharField(
+        max_length=10,
+        choices=TipoJuego.choices,
+        default=TipoJuego.RULETA, # Se asignará 'Ruleta' por defecto
+        verbose_name="Tipo de Juego Post-Encuesta"
+    )
+    tiendas = models.ManyToManyField(Tienda, related_name='encuestasfijas', blank=True)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='encuestasfijas', null=True, blank=True)
+    pais = models.ForeignKey(Pais, on_delete=models.CASCADE, related_name='encuestasfijas', null=True, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+    encabezado = models.TextField(verbose_name="Text de encabezado de ticket", blank=True)
+    texto = models.TextField(verbose_name="Text de pie de página de ticket", blank=True)
+    
+    def __str__(self):
+        return self.titulo
+    
+    class Meta:
+        verbose_name = "Encuesta Fija"
+        verbose_name_plural = "Encuestas Fijas"
+
+    
+ #   def save(self, *args, **kwargs):
+ #       super().save(*args, **kwargs)
+
+        # Lógica de prioridad
+ #       if self.tiendas.exists():
+ #           self.region = None
+ #           self.pais = None
+ #       elif self.region:
+ #           self.pais = None
+ #       super().save(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        # Lógica de prioridad se ejecuta primero
+        if self.tiendas.exists():
+            self.region = None
+            self.pais = None
+        elif self.region:
+            self.pais = None
+        
+        # Se guarda una sola vez con los datos ya corregidos
+        super().save(*args, **kwargs)
+
+
+    def get_tiendas_asignadas(self):
+        """
+        Devuelve un queryset con las tiendas a las que se aplica la encuesta.
+        Prioridad:
+        1. Si tiene tiendas asignadas, devolver esas tiendas.
+        2. Si tiene una región asignada, devolver las tiendas de esa región.
+        3. Si tiene un país asignado, devolver las tiendas de ese país.
+        """
+        if self.tiendas.exists():
+            return self.tiendas.all()  # Tiendas asignadas directamente
+        elif self.region:
+            return Tienda.objects.filter(region=self.region)  # Tiendas de la región asignada
+        elif self.pais:
+            return Tienda.objects.filter(pais=self.pais)  # Tiendas del país asignado
+        else:
+            return Tienda.objects.none()  # No hay tiendas asignadas
+
+class EncuestaFijaRespuesta(models.Model):
+    encuesta_fija = models.ForeignKey(EncuestaFija, on_delete=models.CASCADE, related_name='respuestas')
+    
+    # Datos personales del usuario
+    nombre = models.CharField(max_length=100)
+    apellidos = models.CharField(max_length=100)
+    telefono = models.CharField(max_length=9)
+    codigo_ticket = models.CharField(max_length=255, null=True)
+    fnac = models.DateField()
+    correo = models.EmailField()
+    DNI = models.CharField(max_length=9)
+    acepPolPriv = models.BooleanField()
+    acepProm = models.BooleanField(null=True, blank=True)  # Este campo es opcional
+    fecha_respuesta = models.DateField(default=date.today)
+    tienda = models.ForeignKey(Tienda, on_delete=models.CASCADE, related_name='respuestas_encuesta', null=True, blank=True)
+    
+    # --- CAMPOS NUEVOS ---
+    # Las 3 preguntas de valoración con estrellas (1 a 5)
+    valoracion_producto = models.IntegerField(default=0, verbose_name="Valoración del producto")
+    valoracion_atencion = models.IntegerField(default=0, verbose_name="Valoración de la atención")
+    probabilidad_recomendacion = models.IntegerField(default=0, verbose_name="Probabilidad de recomendación")
+    
+    # Campo de texto para comentarios
+    comentarios_adicionales = models.TextField(null=True, blank=True, verbose_name="Comentarios adicionales")
+
+    # --- CAMPOS ANTIGUOS (OBSOLETOS) ---
+    # Los hacemos 'nullables' para no afectar a los registros existentes.
+    calificacion = models.IntegerField(default=0, null=True, blank=True)
+    pregunta_1_1 = models.CharField(max_length=255, null=True, blank=True)
+    pregunta_1_2 = models.TextField(null=True, blank=True)
+    pregunta_2_1 = models.CharField(max_length=255, null=True, blank=True)
+    pregunta_2_2 = models.TextField(null=True, blank=True)
+    pregunta_3_1 = models.CharField(max_length=255, null=True, blank=True)
+        
+    def __str__(self):
+        return f"{self.nombre} {self.apellidos} - Encuesta: {self.encuesta_fija.titulo}"
+
+    class Meta:
+        verbose_name = "Respuesta de Encuesta Fija"
+        verbose_name_plural = "Respuestas de Encuesta Fija"
+
+
+
+class EncuestaFijaPremio(models.Model):
+    encuesta_fija = models.ForeignKey(EncuestaFija, on_delete=models.CASCADE, related_name='premios_entregados')
+    respuesta = models.ForeignKey(EncuestaFijaRespuesta, on_delete=models.CASCADE, related_name='premios', null=True)
+    # Datos personales del usuario
+    nombre = models.CharField(max_length=100)
+    apellidos = models.CharField(max_length=100)
+    codigo_ticket = models.CharField(max_length=255, null=True)
+    DNI = models.CharField(max_length=9)
+    premio = models.ForeignKey(Premio, on_delete=models.CASCADE, related_name='premios_entregados')
+    fecha_respuesta = models.DateField(default=date.today)
+    tienda = models.ForeignKey(Tienda, on_delete=models.CASCADE, related_name='premios_entregados', null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.nombre} {self.apellidos} - Premio: {self.premio}"
+    class Meta:
+        verbose_name = "Premio de Encuesta Fija"
+        verbose_name_plural = "Premios de Encuesta Fija"
+
+
+
+
+
+class TicketVentasEnLinea(models.Model):
+    nro_ticket = models.CharField(
+        "Número de Ticket",
+        max_length=50,
+        unique=True, # Asegura que no haya tickets duplicados
+        help_text="El código único que se le da al cliente."
+    )
+    tienda = models.ForeignKey(
+        Tienda,
+        on_delete=models.CASCADE,
+        help_text="La tienda online a la que pertenece este ticket."
+    )
+
+    # Añadimos la relación con la encuesta
+    encuesta_fija = models.ForeignKey(
+        EncuestaFija,
+        on_delete=models.PROTECT, # Evita borrar una encuesta si tiene tickets asociados
+        related_name='tickets_online',
+        verbose_name="Encuesta a aplicar"
+    )
+
+    utilizado = models.BooleanField(
+        "¿Ya fue utilizado?",
+        default=False,
+        help_text="Se marca automáticamente cuando el cliente completa la encuesta."
+    )
+    vigencia = models.DateTimeField(
+        "Válido hasta",
+        help_text="Fecha y hora en que el ticket expira."
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.nro_ticket
+
+    def esta_vencido(self):
+        """
+        Devuelve True si la fecha de vigencia ya pasó.
+        Realiza una comparación consciente de la zona horaria.
+        """
+        # Si por alguna razón la vigencia ya es consciente, la usamos directamente
+        if timezone.is_aware(self.vigencia):
+            vigencia_consciente = self.vigencia
+        else:
+            # Si es ingenua, le asignamos la zona horaria de Perú (America/Lima)
+            # Esto asume que tu TIME_ZONE en settings.py es 'America/Lima'
+            vigencia_consciente = timezone.make_aware(self.vigencia)
+        
+        # Ahora comparamos dos fechas del mismo tipo (ambas conscientes)
+        return timezone.now() > vigencia_consciente
+
+    def vig_consciente(self):
+        if timezone.is_aware(self.vigencia):
+            vigencia_consciente = self.vigencia
+        else:
+            # Si es ingenua, le asignamos la zona horaria de Perú (America/Lima)
+            # Esto asume que tu TIME_ZONE en settings.py es 'America/Lima'
+            vigencia_consciente = timezone.make_aware(self.vigencia)
+        return vigencia_consciente
+
+
+    def enlace_encuesta(self):
+        """
+        Genera el enlace a la encuesta para este ticket.
+        """
+        # Generamos la URL usando el 'name' de tu urls.py
+        url = reverse('fijaConTicket', args=[self.tienda.id, self.encuesta_fija.id, self.nro_ticket])
+        return format_html('<a href="{}" target="_blank">{}</a>', url, self.nro_ticket)
+    
+    enlace_encuesta.short_description = "Enlace para el Cliente"
+
+    class Meta:
+        verbose_name = "Ticket de Venta en Línea"
+        verbose_name_plural = "Tickets de Venta en Línea"
+

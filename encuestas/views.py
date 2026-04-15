@@ -1,0 +1,549 @@
+from django.utils import timezone
+from decimal import Decimal
+import random
+from django.shortcuts import get_object_or_404, render, redirect
+from django.core.serializers import serialize
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
+from django.urls import reverse
+
+from cupones import models
+from cupones.models import Cupon
+from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea
+from .forms import EncuestaForm, EncuestaFijaForm, TicketForm
+from django.utils.html import format_html
+from django.db.models import F
+import json
+
+
+
+# Create your views here.
+
+def consultaEncuestaFijaTiendaApi(request, tienda_id):
+    """
+    Verifica si una encuesta está asignada a una tienda y devuelve la URL correspondiente.
+    """
+    # Intentar obtener la tienda
+    try:
+        tienda = Tienda.objects.get(id_efsystem=tienda_id, activa=True)
+    except Tienda.DoesNotExist:
+        # Si la tienda no existe, devuelve un status 404 y URL vacía
+        return JsonResponse({'resp': '', 'status': 1, 'msg': '', 'texto_imprimir':'', 'token':'nnnnnnnnnn'}, status=200)
+
+    # Validar que la tienda esté asignada a la encuesta
+    e_asignada = tienda.encuestasFijas_asignadas_id()
+    if not e_asignada:
+        # Construye la URL si la encuesta está asignada a la tienda
+        return JsonResponse({'resp': '', 'status': 2, 'msg': '', 'texto_imprimir':'', 'token':'nnnnnnnnnn'}, status=200)   
+
+    # Verificar que la petición sea GET
+    if request.method == 'GET':#        
+        url = reverse('fija', args=[tienda.id, e_asignada])
+        return JsonResponse({'resp': url, 'status': 0, 'msg': '', 'texto_imprimir':'tttt tt tttt ttt ttttt tttttt ttttttt ttttttt', 'token':'nnnnnnnnnn'}, status=200)  
+    else:
+        # Si la petición no es GET, devolver error 405 (Método no permitido)
+        return JsonResponse({'resp': '', 'status': 405, 'msg': '', 'texto_imprimir':'', 'token':'nnnnnnnnnn'}, status=405)
+
+
+
+
+def manejo_404(request, exception):
+    return render(request, "404.html", {})
+
+def politicas(request):
+    return render(request, "politicas.html")
+
+
+def IndexView(request):
+    return render(request, "index.html")
+
+def mensajeCorreo(request):
+    if request.method == 'POST':
+        return HttpResponse("Datos procesados")
+    else:
+        return HttpResponse("Este es un form de envío")
+    
+def sorteo_view(request, tienda_id):
+    tienda = get_object_or_404(Tienda, id=tienda_id)
+    monto = get_object_or_404(TicketConsulta, tienda=tienda_id)
+    try:
+        premio = tienda.sortear_premio()
+        mensaje = f'¡Felicidades! Has ganado el premio: {premio.nombre}.'
+    except ValueError as e:
+        mensaje = str(e)
+    
+    return render(request, 'sorteo_resultado.html', {'mensaje': mensaje})
+    
+def polls(request, encuesta_id, tienda_id, codigo_ticket=None):
+    encuesta = get_object_or_404(Encuesta, id=encuesta_id, activa=True)
+    tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
+    preguntas = encuesta.encuesta_preguntas.all()
+
+    if request.method == 'POST':
+        form = EncuestaForm(request.POST, preguntas=preguntas)
+        if form.is_valid():
+            # Extraer el código del ticket del formulario si no se proporciona en la URL
+            codigo_ticket = form.cleaned_data.get('codigo_ticket', codigo_ticket)
+
+            # Guardar las respuestas del formulario
+            for pregunta_id, respuesta in form.cleaned_data.items():
+                if pregunta_id == 'codigo_ticket':
+                    continue
+                
+                # Extraer el ID de la pregunta del campo
+                try:
+                    pregunta_id = pregunta_id.split('_')[1]  
+                    pregunta = get_object_or_404(EncuestaPregunta, pregunta_id=pregunta_id, encuesta=encuesta).pregunta
+                except (IndexError, EncuestaPregunta.DoesNotExist):
+                    return render(request, 'encuestas/error.html', {'mensaje': 'Pregunta no encontrada'})                
+
+                tipo_pregunta = pregunta.tipo_de_pregunta
+                if tipo_pregunta == 'seleccion_simple':
+                    opcion = get_object_or_404(Opcion, id=respuesta)
+                    Respuesta.objects.create(
+                        encuesta=encuesta,
+                        pregunta=pregunta,
+                        codigo_ticket=codigo_ticket,
+                        opcion=opcion,
+                        tienda=tienda,
+                    )
+                else:
+                    Respuesta.objects.create(
+                        encuesta=encuesta,
+                        pregunta=pregunta,
+                        codigo_ticket=codigo_ticket,
+                        texto_de_respuesta=respuesta,
+                        tienda=tienda,
+                    )
+
+            return redirect('ruleta', encuesta_id = encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
+    else:
+        initial_data = {'codigo_ticket': codigo_ticket} if codigo_ticket else {}
+        form = EncuestaForm(initial=initial_data, preguntas=preguntas)
+
+    context = {
+        'form': form,
+        'encuesta': encuesta,
+        'tienda': tienda,
+        'codigo_ticket': codigo_ticket,
+    }
+    return render(request, 'poll.html', context)
+
+
+def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
+    tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
+    encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id)
+    respuestas = get_object_or_404(EncuestaFijaRespuesta, codigo_ticket=codigo_ticket)
+
+
+    if codigo_ticket:
+        try:
+            # Verificar si ya existe un premio entregado con ese código de ticket
+            premio_existente = EncuestaFijaPremio.objects.get(
+                codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija
+            )
+            # Si ya existe, mostrar un mensaje o redirigir
+            return render(request, 'RespEmitida.html', {
+                'error': "Ya se ha entregado un premio con este código de ticket.",
+                'texto': "Gracias por tu participación"
+            })
+        except EncuestaFijaPremio.DoesNotExist:
+            # No existe un premio con este código, continuar con la lógica normal de la ruleta
+            pass
+
+# 'error': "Ya se ha entregado un premio con este código de ticket.",
+
+    # 2) Intentamos cargar la consulta; si no existe, monto=0
+    ticket_consulta = TicketConsulta.objects.filter(
+        tienda=tienda,
+        codigo=codigo_ticket
+    ).first()
+
+    monto = ticket_consulta.monto if ticket_consulta else Decimal('0')
+     
+    # 3) Armamos la lista de premios con su stock según monto
+    premios_qs = TiendaPremio.objects.filter(tienda=tienda, visible=True)
+
+    premio_data = []
+    for tp in premios_qs:
+        stock = tp.stock_disponible(monto)  # devuelve real o 0
+        premio_data.append({
+            'nombre': tp.premio.nombre,
+            'stock':  stock,
+            'probabilidad': stock,
+        })
+
+    # Obtener los premios de la tienda con su stock
+#    premios = TiendaPremio.objects.filter(tienda=tienda)
+    
+#    premio_data = [
+#        {'nombre': premio.premio.nombre, 'probabilidad': premio.cantidad}
+#        for premio in premios
+#    ]
+    
+    context = {
+        'tienda': tienda,
+        'encuesta_id': encuesta_fija.id,
+        'codigo_ticket': codigo_ticket,
+        'premiosDat': premio_data,
+        'respuestas': respuestas,
+        'tipojuego': encuesta_fija.tipo_juego,
+    }
+    
+    if encuesta_fija.tipo_juego == EncuestaFija.TipoJuego.CAJAS:
+        # Redirige a la URL del juego de cajas
+        return render(request, 'tabla_regalos.html', context)
+    else: # Por defecto, o si es RULETA
+        # Redirige a la URL de la ruleta
+        return render(request, 'ruleta.html', context)
+    
+
+
+
+def pideticket(request, encuesta_id, tienda_id):
+    encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id, activa=True)
+    tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
+    form = TicketForm()
+
+    # Validar que la tienda esté asignada a la encuesta
+    tiendas_asignadas = encuesta_fija.get_tiendas_asignadas()
+    if not tiendas_asignadas.filter(id=tienda.id).exists():
+        return render(request, 'RespEmitida.html', {
+            'error': "! No hay sorteos en esta tienda !.",
+            'texto': "Gracias por tu participación"
+        })
+
+    if request.method == 'POST':
+        # Capturar el código del ticket desde el formulario
+        codigo_ticket = request.POST.get('codigo_ticket')
+        if codigo_ticket:
+            # Aquí puedes agregar validación del ticket si es necesario
+            # Validar si el ticket cumple con las condiciones
+            return redirect('fijaConTicket', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
+        else:
+            # Si no se ingresó un código, vuelve a renderizar la misma página con un mensaje de error
+            return render(request, 'formulario_ticket.html', {
+                'tienda': tienda,
+                'encuesta': encuesta_fija,
+                'form': form,
+                'error': '¡Por favor ingresa un código de ticket válido!',
+            })
+    else:
+        # Renderizar la página por primera vez (método GET)
+        return render(request, 'ticket.html', {
+            'tienda': tienda,
+            'encuesta': encuesta_fija,
+            'form': form,
+        })
+    
+
+
+
+def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
+    print("Encuesta Fija Ticket - Ronny")
+    encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id, activa=True)
+    tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
+
+
+
+    # Validar que la tienda esté asignada a la encuesta
+    t_asignadas = encuesta_fija.get_tiendas_asignadas()
+
+
+    if not t_asignadas.filter(id=tienda.id).exists():
+        return render(request, 'RespEmitida.html', {
+                'error': "! No hay sorteos en esta tienda !.",
+                'texto': "Gracias por tu participación"
+            })
+
+    # Verificamos si hay stock
+    if tienda.premios_stock() <= 0:
+        return render(request, 'RespEmitida.html', {
+            'error': "! Se agotaron los premios !.",
+            'texto': "Gracias por tu participación"
+    })
+
+
+    if tienda.requiere_validacion_ticket:
+        try:
+            # 1. Buscamos el ticket en la tabla de Ventas en Línea
+            ticket = TicketVentasEnLinea.objects.get(nro_ticket=codigo_ticket)
+
+
+            # 3. Verificamos si el ticket ya fue marcado como 'utilizado'
+            if ticket.utilizado:
+                # Si ya fue usado, significa que la encuesta ya se llenó.
+                # Ahora procedemos a la siguiente validación: ¿se entregó el premio?
+                try:
+                    premio_existente = EncuestaFijaPremio.objects.get(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija)
+                    # Si el premio existe, mostramos el mensaje de que ya fue entregado y terminamos.
+                    # (Reutilizo tu lógica y variables para este mensaje)
+                    tiendaprem = premio_existente.tienda
+                    nombreprem = premio_existente.nombre
+                    apellidosprem = premio_existente.apellidos
+                    prem = premio_existente.premio
+                    idprem = premio_existente.premio.descripcion
+                    idnombre = premio_existente.respuesta.DNI
+                    errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente Ganador<br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><span>({idprem})</span><br><br>"
+                    return render(request, 'RespEmitida.html', { 'error': errorprem, 'texto': "¡Gracias por participar!" })
+                except EncuestaFijaPremio.DoesNotExist:
+                    # Si la encuesta fue llenada ('utilizado'=True) pero el premio NO ha sido entregado,
+                    # lo enviamos directamente a la ruleta.
+                    return redirect('ruleta', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
+            else:
+                # Si el ticket no ha sido usado, verificamos si está vigente
+                # 2. Verificamos si ha expirado (esto es una validación final)   'texto': timezone.now().strftime("%d/%m/%Y %H:%M:%S")
+                if ticket.esta_vencido():
+                    #  texto_final = f"{timezone.now().strftime('%d/%m/%Y %H:%M:%S')}  -  {ticket.vigencia.strftime('%d/%m/%Y %H:%M:%S')}"
+                    return render(request, 'RespEmitida.html', {
+                        'error': "Lo sentimos, este código de ticket ha expirado.",
+                        'texto': "¡Gracias por participar!"
+                    })
+                pass
+        except TicketVentasEnLinea.DoesNotExist:
+            # Si el ticket no existe, es inválido.
+            return render(request, 'RespEmitida.html', {
+                'error': "El código de ticket ingresado no es válido.",
+                'texto': "Gracias por tu participación"
+            })
+    # No requiere validación de ticket
+
+
+    # Validar si ya existe una respuesta con el mismo código de ticket (si el código fue proporcionado)
+    plantilla = 'poll_f1.html'
+    if codigo_ticket:
+        try:
+            # Si existe una respuesta con ese código y encuesta, redirigir o mostrar error
+            respuesta_existente = EncuestaFijaRespuesta.objects.get(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija)
+
+            try:
+                # Verificar si ya existe un premio entregado con ese código de ticket
+                premio_existente = EncuestaFijaPremio.objects.get(
+                    codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija
+                )
+                # Si ya existe, mostrar un mensaje o redirigir
+                tiendaprem = premio_existente.tienda
+                nombreprem = premio_existente.nombre
+                apellidosprem = premio_existente.apellidos
+                prem = premio_existente.premio
+                idprem = premio_existente.premio.descripcion
+                idnombre = premio_existente.respuesta.DNI
+                errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente Ganador<br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><span>({idprem})</span><br><br>"
+                return render(request, 'RespEmitida.html', {
+                    'error': errorprem,
+                    'texto': "¡Gracias por participar en nuestra Ruleta de Premios!"
+                })
+            except EncuestaFijaPremio.DoesNotExist:
+                # No existe un premio con este código, continuar con la lógica normal de la ruleta
+                return redirect('ruleta', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
+                pass
+        except EncuestaFijaRespuesta.DoesNotExist:
+            # No existe una respuesta con este código, continuar con la lógica normal
+            pass
+    else:
+        plantilla = 'ticket.html'    
+
+    if request.method == 'POST':
+        form = EncuestaFijaForm(request.POST)
+        if form.is_valid():
+            codigo_ticket_form = form.cleaned_data['codigo_ticket']
+            # Validar si ya existe una respuesta con el mismo código de ticket y encuesta fija
+            if EncuestaFijaRespuesta.objects.filter(
+                codigo_ticket=codigo_ticket_form, encuesta_fija=encuesta_fija
+            ).exists():
+                # Si existe una respuesta, muestra un error
+                return render(request, 'RespEmitida.html', {
+                    'error': "Ya se ha enviado una respuesta..",
+                    'texto': "Gracias por tu participación"
+                })            
+            # Procesa los datos
+            # Crear una instancia del modelo EncuestaFijaRespuesta y llenarla con los datos del formulario
+            respuesta = EncuestaFijaRespuesta(
+                encuesta_fija=encuesta_fija,
+                nombre=form.cleaned_data['nombre'],
+                apellidos=form.cleaned_data['apellidos'],
+                telefono=form.cleaned_data['telefono'],
+                codigo_ticket=form.cleaned_data['codigo_ticket'],
+                fnac=form.cleaned_data['fnac'],
+                correo=form.cleaned_data['correo'],
+                DNI=form.cleaned_data['DNI'],
+                tienda = Tienda.objects.get(id=tienda_id),
+                acepPolPriv=form.cleaned_data['acepPolPriv'],
+                acepProm=form.cleaned_data.get('acepProm', False),  # Este campo es opcional
+                # --- Asignar los nuevos campos de valoración ---
+                valoracion_producto=form.cleaned_data['valoracion_producto'],
+                valoracion_atencion=form.cleaned_data['valoracion_atencion'],
+                probabilidad_recomendacion=form.cleaned_data['probabilidad_recomendacion'],
+                comentarios_adicionales=form.cleaned_data.get('comentarios_adicionales')
+            )
+            # Guardar la respuesta en la base de datos
+            respuesta.save()
+
+
+            # --- NUEVO: MARCAMOS EL TICKET ONLINE COMO UTILIZADO ---
+            if tienda.requiere_validacion_ticket:
+                try:
+                    ticket_a_marcar = TicketVentasEnLinea.objects.get(nro_ticket=codigo_ticket_form)
+                    ticket_a_marcar.utilizado = True
+                    ticket_a_marcar.save()
+                    print(f"Ticket {ticket_a_marcar.nro_ticket} marcado como utilizado.")
+                except TicketVentasEnLinea.DoesNotExist:
+                    # Esto no debería pasar si la validación inicial funcionó, pero es una buena práctica manejarlo
+                    pass
+            # --------------------------------------------------------
+
+
+            # Redirigir a una página de confirmación o agradecimiento
+            print('Respuesta Almacenada')
+            return redirect('ruleta', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
+    else:
+        initial_data = {'codigo_ticket': codigo_ticket} if codigo_ticket else {}
+        form = EncuestaFijaForm(initial=initial_data)
+
+    context = {
+        'encuesta': encuesta_fija,
+        'tienda': tienda,
+        'form': form,
+        'calificacion': 0,
+        'codigo_ticket': codigo_ticket,
+    }
+
+    return render(request, plantilla, context)
+
+
+
+
+
+
+
+def guardar_premio(request):
+    premio = request.POST.get('premio')
+    codigo_ticket = request.POST.get('codigo_ticket')
+    encuesta_id = request.POST.get('encuesta_fija')
+    tienda_id = int(request.POST.get('tienda'))
+    encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id)
+    respuestas = get_object_or_404(EncuestaFijaRespuesta, codigo_ticket=codigo_ticket)
+
+    tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
+    # Validar que la tienda esté asignada a la encuesta
+    t_asignadas = encuesta_fija.get_tiendas_asignadas()
+    if not t_asignadas.filter(id=tienda.id).exists():
+        return render(request, 'RespEmitida.html', {
+                'error': "! No hay sorteos en esta tienda !.",
+                'texto': "Gracias por tu participación"
+            })
+
+
+    # Validar si ya existe una respuesta con el mismo código de ticket (si el código fue proporcionado)
+    if codigo_ticket:
+        try:
+            # Si existe una respuesta con ese código y encuesta, redirigir o mostrar error
+            respuesta_existente = EncuestaFijaPremio.objects.get(
+                codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija.id
+            )
+            # Mostrar un mensaje o redirigir si ya existe la respuesta
+            return render(request, 'RespEmitida.html', {
+                'error': "Premio entregado.",
+                'texto': "Gracias por tu participación"
+            })
+        except EncuestaFijaPremio.DoesNotExist:
+            # No existe una respuesta con este código, continuar con la lógica normal
+            pass
+
+
+    # Lógica para almacenar el premio ganado
+    obPremio = Premio.objects.get(nombre=premio)
+    premio_obj = TiendaPremio.objects.get(tienda_id =tienda_id, premio_id=obPremio.id)  
+    # Puedes obtener datos del usuario si es necesario
+    # y luego crear una instancia de EncuestaFijaPremio
+    print('Antes de entregar:')
+    print("Hay {} {}".format(premio_obj.cantidad, obPremio))
+#    print("Hay " + str(premio_obj.cantidad) + " " + obPremio)
+    entregado = EncuestaFijaPremio.objects.create(
+        encuesta_fija=encuesta_fija,  # Asegúrate de pasar la encuesta correcta
+        respuesta=respuestas,  # Relacionar con la respuesta de la encuesta fija
+        nombre=respuestas.nombre,
+        apellidos=respuestas.apellidos,
+        codigo_ticket=codigo_ticket,
+        DNI=respuestas.DNI,
+        premio=obPremio,
+        tienda = Tienda.objects.get(id=tienda_id),
+    )
+    print('Luego de entregar:')
+    premio_obj.cantidad = premio_obj.cantidad - 1
+    premio_obj.save()
+    print("Premio: {}".format(obPremio))
+    print("Cliente: {}".format(respuestas.nombre))
+    print("Tienda: {}".format(Tienda.objects.get(id=tienda_id)))
+    context = {
+        'premio': entregado,
+    }
+    return render(request, 'premio_entregado1.html', context)
+
+
+
+
+
+
+def vista_juego_regalos(request, encuesta_id, tienda_id, codigo_ticket):
+    """
+    Esta vista maneja la lógica para el juego de la tabla de regalos.
+    """
+
+    tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
+    encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id)
+    respuestas = get_object_or_404(EncuestaFijaRespuesta, codigo_ticket=codigo_ticket)
+
+
+    if codigo_ticket:
+        try:
+            # Verificar si ya existe un premio entregado con ese código de ticket
+            premio_existente = EncuestaFijaPremio.objects.get(
+                codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija
+            )
+            # Si ya existe, mostrar un mensaje o redirigir
+            return render(request, 'RespEmitida.html', {
+                'error': "Ya se ha entregado un premio con este código de ticket.",
+                'texto': "Gracias por tu participación"
+            })
+        except EncuestaFijaPremio.DoesNotExist:
+            # No existe un premio con este código, continuar con la lógica normal de la ruleta
+            pass
+
+
+
+
+    # --- 1. Lógica para seleccionar el premio ---
+    # Aquí debes replicar o adaptar la lógica que usas para la ruleta
+    # para determinar qué premio (cupón) se otorgará.
+    # Por ejemplo, podrías buscar cupones activos con usos disponibles.
+    
+    # A MODO DE EJEMPLO: seleccionamos el primer cupón activo que encontramos.
+    # ¡DEBES REEMPLAZAR ESTO CON TU LÓGICA REAL DE PROBABILIDAD Y DISPONIBILIDAD!
+    premio_seleccionado = Cupon.objects.filter(
+        estatus='ACTIVO',
+        usos_actuales__lt=F('limite_usos') # Se quita el prefijo 'models.'
+    ).first()
+    
+    premio_obtenido_str = "¡Sigue intentando!" # Mensaje por defecto si no hay premios
+    if premio_seleccionado:
+        # Formateamos el string del premio según su tipo
+        if premio_seleccionado.tipo == 'PORCENTAJE':
+            premio_obtenido_str = f"un Cupón del {int(premio_seleccionado.valor)}% de descuento"
+        else:
+            premio_obtenido_str = f"un Cupón de S/{premio_seleccionado.valor:.2f} de descuento"
+
+    # --- 2. Lógica para determinar el intento ganador ---
+    # Se decide aleatoriamente si el usuario ganará en el 1er, 2do o 3er intento.
+    intento_ganador = random.choice([1, 2, 3])
+
+    # --- 3. Construir el contexto para la plantilla ---
+    # Este diccionario contiene las variables que tu HTML necesita.
+    context = {
+        'intento_ganador': intento_ganador,
+        'premio_obtenido': premio_obtenido_str,
+        'rango_celdas': range(9),
+    }
+
+    # 4. Renderizar la plantilla HTML y pasarle el contexto
+    # Asegúrate de que tu archivo esté en 'templates/encuestas/tabla_regalos.html'
+    return render(request, 'tabla_regalos.html', context)

@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block header %}
+<style>
+body {
+    background-color: #eeeeee;
+    background-image: url("{% static 'img/fondoruleta.png' %}");
+    background-repeat: repeat repeat;
+
+    text-align: start; 
+    transition-property: opacity, transform; 
+    font-family: 'Red Hat Display' !important; 
+    font-style: normal; 
+    font-stretch: normal; 
+    font-optical-sizing: auto; 
+    line-height: initial; 
+    opacity: 1; 
+    transition-duration: 350ms;
+}
+
+.label-ruleta {
+    font-size: 15px;
+    font-weight: 600; 
+}
+
+.titulo-ruleta {
+    font-size: 20px;
+    font-weight: 600; 
+}
+
+.hidden {
+    display: none;
+}
+
+.slider-container {
+    margin: 20px 0;
+    text-align: center;
+    width: 100%;
+}
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+}
+.slider-labels img {
+    width: 30px;
+    height: 30px;
+}
+.slider-value {
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+input[type="range"] {
+    width: 100%; /* Hacer que el slider ocupe el 100% */
+}
+
+.selected-icon {
+    border: 2px solid hsl(54, 97%, 58%);  /* Un borde más grueso */
+    border-radius: 50%;      /* Esto hace que el borde sea redondeado */
+    box-shadow: 0 0 10px rgba(247, 224, 174, 0.5); /* Añade una sombra para dar más énfasis */
+    transition: border 0.3s ease; /* Transición suave para el cambio de borde */
+
+}
+
+</style>    
+{% endblock  %}
+
+{% block title %}
+    Polls
+{% endblock title %}
+    Polls
+{% block content %}
+  
+
+<div class="container">
+    <div class="row mb-1">
+        <div class="col-1 col-md-3 themed-grid-col"></div>
+        <div class="col-10 col-md-6 themed-grid-col">
+            <br>
+            <div class="card">
+                <form method="POST">
+                    <div class="card-header">
+                        <img src="{% static 'img/Logo_EFperfumes1.png' %}" class="img-fluid mx-auto d-block" alt="...">
+                        <p class="text-center">¡ Llena nuestra encuesta y lleva un premio sorpresa !</p>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title titulo-ruleta">Tienda: {{ tienda.nombre }}</h5>
+                        <p class="card-text">{{ encuesta.descripcion }}</p>
+
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <!-- Campos personales -->
+                                <div>
+                                    <label for="id_codigo_ticket" class="label-ruleta">{{ form.codigo_ticket.label }}</label>
+                                    {{ form.codigo_ticket }}
+                                    <small>{{ form.codigo_ticket.help_text }}</small>
+                                    {{ form.codigo_ticket.errors }}
+                                </div>
+                            </div>
+                                    
+                    </div>
+                    <!-- Botón de envío -->
+                    <div class="card-footer text-center">
+                        <button type="submit" class="btn btn-primary">Siguiente</button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+<br>
+
+
+{% endblock content %}
+    
