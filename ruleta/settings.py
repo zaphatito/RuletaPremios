@@ -13,10 +13,11 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from django.conf import settings
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
@@ -25,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-v+gu1vjp9^rqw@7cf8t^sk)#ya)1=*fxnf4*9q)z^g4gzgy34a'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.getenv('DEBUG') == 'True'
 
 ALLOWED_HOSTS = ['efperfumes.com','rueda.efperfumes.com','*']
 
@@ -89,13 +90,14 @@ WSGI_APPLICATION = 'ruleta.wsgi.application'
 #}
 
 DATABASES = {
-'default': {
-'ENGINE': 'django.db.backends.mysql',
-'NAME': 'codigos_sorteos',
-'USER': 'user_sorteos',
-'PASSWORD': 'kUxEuSHvqDoN',
-'HOST': '127.0.0.1',
-}
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
+    }
 }
 
 
