@@ -9,23 +9,19 @@
 <style>
     body {
         background-color: #003468 !important;
-       /* background-image: url("{% static 'img/fondoruleta.png' %}");*/
         background-repeat: repeat;
         font-family: "Montserrat", sans-serif !important;
         color: #eeeeee !important;
     }
 
     .card {
-        /* Fondo blanco con un 80% de opacidad (20% de transparencia) */
         background-color: rgba(0, 0, 0, 0) !important;
-        
-       /* background-color: none !important;*/
     }
 
     .card-borde-personalizado,
     .card-borde-personalizado .card-header,
     .card-borde-personalizado .card-footer {
-        border-color: none ; /* O el color que prefieras */
+        border-color: none ; 
         border: 0px solid rgba(0, 0, 0, .125) !important;
         background-color: rgba(0, 0, 0, 0) !important;
     }
@@ -40,60 +36,47 @@
     }
 
     .ruleta-frame {
-        position: relative; /* Esencial para posicionar la capa del marco */
+        position: relative; 
         width: 100%;
-        max-width: 550px; /* Ancho máximo del marco */
-        aspect-ratio: 1 / 1; /* NUEVO: Mantiene la forma cuadrada/circular perfecta automáticamente */
+        max-width: 550px; 
+        aspect-ratio: 1 / 1; 
         display: flex;
         align-items: center;
         justify-content: center;
         margin: 0 auto;
         filter: drop-shadow(0px 10px 15px rgba(0, 0, 0, 0.3));        
-        /* Ya NO ponemos la imagen de fondo aquí */
     }
 
-    /* AÑADE ESTA NUEVA REGLA */
     .ruleta-frame::after {
-        content: ''; /* Requerido para que el pseudo-elemento se muestre */
+        content: ''; 
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        
-        /* La imagen del marco va aquí */
         background-image: url("{% static 'images/Aro Ruleta 4.png' %}");
         background-size: contain;
         background-repeat: no-repeat;
-        
-        /* Estas dos líneas son la clave */
-        z-index: 10; /* Pone esta capa por encima de las demás (el canvas tiene z-index 0 por defecto) */
-        pointer-events: none; /* Hace que esta capa sea "invisible" a los clics, para que puedas presionar el botón de giro */
+        z-index: 10; 
+        pointer-events: none; 
     }
 
-    /* Ajustamos el contenedor de la ruleta para que encaje dentro del marco */
     .wheel-container {
-        filter: none; /* Le quitamos la sombra propia porque ahora la tiene el marco */
+        filter: none; 
     }
 
-
-    .ruleta-wrapper { /* Un nuevo contenedor para el canvas y el puntero */
+    .ruleta-wrapper { 
         position: relative;
     }
 
-    /* MEJORADO: El nuevo puntero/marcador */
     .triangle {
         position: absolute;
         top: 50%;
-        transform: translateY(-50%) rotate(45deg); /* La rotación se mantiene */
+        transform: translateY(-50%) rotate(45deg); 
         z-index: 11;
-
-        /* --- AJUSTES A PORCENTAJES --- */
-        width: 10%; /* CAMBIADO: Antes 30px */
-        height: 10%; /* CAMBIADO: Antes 30px */
-        right: -3%; /* CAMBIADO: Antes -15px */
-
-        /* --- El resto del estilo 3D se mantiene --- */
+        width: 10%; 
+        height: 10%; 
+        right: -3%; 
         background: linear-gradient(135deg,  #E1253C, #c54954, #97222D);
         border-radius: 50% 50% 50% 0;
         box-shadow: 
@@ -102,17 +85,13 @@
             inset 2px 2px 4px rgba(255,255,255,0.6);
     }
 
-
-
     .ruleta, #canvas {
-        width: 100%; /* CAMBIADO: Hace que el canvas siempre llene el contenedor del marco */
+        width: 100%; 
         height: 100%;
     }
 
-
-    /* MEJORADO: El botón central */
     .center-circle {
-        width: 20%;  /* Antes 100px */
+        width: 20%;  
         height: 20%; 
         border-radius: 50%;
         position: absolute;
@@ -125,12 +104,6 @@
         cursor: pointer;
         transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         background: radial-gradient(circle at 50% 35%, #FFFFFF, #979797 85%, #494949 100%);
- /*       box-shadow: 
-        inset 0px 5px 10px rgba(255, 255, 255, 0.5), 
-        inset 0px -5px 15px rgba(0, 0, 0, 0.3),   
-        0px 5px 15px rgba(0, 0, 0, 0.3),           
-        0px 0px 30px 10px rgba(255, 255, 204, 0.4);  */
-
         box-shadow: 
             inset 0px 5px 10px rgba(255, 255, 255, 0.5),
             inset 0px -5px 15px rgba(0, 0, 0, 0.3),
@@ -152,23 +125,8 @@
     }
     .center-image {
         width: 60%;
-        /* Sombra sutil para que el logo se integre mejor */
         filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.4));
     }
-
-
-    
-    /* Estilos responsivos (sin cambios mayores) */
-    @media (max-width: 576px) {
-        /* El único ajuste que necesitamos es el del puntero, 
-        ya que su posición en píxeles puede necesitar un retoque 
-        cuando la ruleta es muy pequeña. */
-
-
-        /* El resto de los elementos (.ruleta-frame, .center-circle, etc.) 
-        se ajustarán automáticamente gracias al diseño fluido. */
-    }
-
 
 </style>
 {% endblock  %}
@@ -178,82 +136,58 @@
 {% endblock title %}
     
 {% block content %}
-<!-- Modal de Bootstrap -->
-<div class="modal fade" id="premioModal" tabindex="-1" aria-labelledby="premioModalLabel" aria-hidden="true">
+<div class="modal fade" id="premioModal" tabindex="-1" aria-labelledby="premioModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <img src="{% static 'images/felicidades.png' %}" class="img-fluid mx-auto d-block" alt="...">
+        <div class="modal-header border-0">
+            <img id="imagenModalResultado" src="{% static 'images/felicidades.png' %}" class="img-fluid mx-auto d-block" alt="...">
         </div>
-        <div class="modal-body">
-            <p><br><br></p>
-            <p id="mensajePremio" style="color:#FFFFFF; font-size: 2rem;" class="text-center"></p> <!-- Aquí aparecerá el premio ganado -->
-            <p><br><br></p>
+        <div class="modal-body text-center">
+            <p id="mensajePremio" style="color:#FFFFFF; font-size: 2rem; margin: 2rem 0;" class="fw-bold"></p> 
+            <button type="button" class="btn btn-light btn-lg mt-3" onclick="finalizarSorteo()">Finalizar</button>
         </div>
       </div>
     </div>
 </div>
 
-<div class="container"></div>
+<div class="container">
     <div class="row mb-1">
         <div class="col-1 col-md-4 themed-grid-col"></div>
         <div class="col-10 col-md-4 themed-grid-col">
             <br>
             <div class="card card-borde-personalizado">
-                <form method="POST">
-                    <div class="card-header">
-                        <img src="{% static 'images/gira y gana.png' %}" class="img-fluid mx-auto d-block" alt="...">
-                        <br>
-						<!--<h5 class="card-title titulo-ruleta text-center">Ruleta de premios de EF Perfumes</h5>
-                        <br>
-						<div class="row mb-3">
-							<div class="col-12 themed-grid-col text-center">Tienda: {{ tienda }}</div>
-						</div> 
-						<div class="row mb-3" >
-							<div class="col-12 themed-grid-col text-center">Ticket: {{ codigo_ticket }}</div>
-						</div> 
-						<div class="row mb-3" >
-							<div class="col-6 themed-grid-col "><p>Premio</p></div>
-							<div class="col-6 themed-grid-col"><p id="winner" style="display: none;">&nbsp;</p></div>
-						</div>-->
-						<p id="winner" style="display: none;"></p>
-                    </div>
-                    <div class="card-body">
-                        
-                        <br>
-                        <div class ="ruleta-frame">
-                            <div class="wheel-container">
-                                <div class="ruleta-wrapper">
-                                    <canvas class="ruleta" id="canvas" width="480" height="480"></canvas>
-                                    <!--<div class="triangle"></div>-->
-                                </div>
-                                <div class="center-circle"  onclick="spin()"> <img src="{% static 'img/LogoLetrasEF.png' %}" alt="Logo" class="center-image logo">
-                                </div>
+                <div class="card-header border-0">
+                    <img src="{% static 'images/gira y gana.png' %}" class="img-fluid mx-auto d-block" alt="...">
+                    <p id="winner" style="display: none;"></p>
+                </div>
+                <div class="card-body">
+                    <br>
+                    <div class ="ruleta-frame">
+                        <div class="wheel-container">
+                            <div class="ruleta-wrapper">
+                                <canvas class="ruleta" id="canvas" width="480" height="480"></canvas>
+                            </div>
+                            <div class="center-circle" onclick="spin()"> 
+                                <img src="{% static 'img/LogoLetrasEF.png' %}" alt="Logo" class="center-image logo">
                             </div>
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
-
         </div>
         <div class="col-1 col-md-4 themed-grid-col"></div>
     </div>
 </div>
 <br>
-
-
-
-
-
 {% endblock content %}
     
 
 {% block js_footer %}
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
 <script id="premios-data" type="application/json">{{ premiosDat|safe }}</script>
+
 <script>
-    // --- INICIO DEL CÓDIGO JS CORREGIDO ---
-    
     function createStripesPattern() {
         const patternCanvas = document.createElement('canvas');
         const patternCtx = patternCanvas.getContext('2d');
@@ -261,7 +195,7 @@
         patternCanvas.width = PATTERN_SIZE;
         patternCanvas.height = PATTERN_SIZE;
 
-        patternCtx.strokeStyle = 'rgba(0, 0, 0, 0.08)'; // Líneas oscuras y sutiles
+        patternCtx.strokeStyle = 'rgba(0, 0, 0, 0.08)'; 
         patternCtx.lineWidth = 1;
         patternCtx.beginPath();
         patternCtx.moveTo(0, PATTERN_SIZE);
@@ -271,142 +205,48 @@
         return patternCtx.createPattern(patternCanvas, 'repeat');
     }
 
+    const selectPattern = createStripesPattern();
 
-
-    function createDotPattern() {
-        const patternCanvas = document.createElement('canvas');
-        const patternCtx = patternCanvas.getContext('2d');
-        const PATTERN_SIZE = 20; // Un tamaño mayor para que los puntos no estén tan juntos
-        patternCanvas.width = PATTERN_SIZE;
-        patternCanvas.height = PATTERN_SIZE;
-
-        // Dibujamos un punto en el centro del pequeño lienzo
-        patternCtx.fillStyle = 'rgba(0, 0, 0, 0.12)'; // Puntos oscuros y semitransparentes
-        patternCtx.beginPath();
-        patternCtx.arc(PATTERN_SIZE / 2, PATTERN_SIZE / 2, 1.5, 0, 2 * Math.PI); // Círculo pequeño
-        patternCtx.fill();
-        
-        return patternCtx.createPattern(patternCanvas, 'repeat');
-    }
-
-    const stripesPattern = createStripesPattern();
-    const dotPattern = createDotPattern(); // Puedes renombrar la variable a "dotPattern" si prefieres
-    const selectPattern = stripesPattern;
-
-// Simula fuegos artificiales
+    // Simula fuegos artificiales (Confeti)
     function lanzarFuegosArtificiales() {
-    var duration = 2 * 1000; // El efecto durará 2 segundos
-    var animationEnd = Date.now() + duration;
-    var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+        var duration = 2 * 1000; 
+        var animationEnd = Date.now() + duration;
+        var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1060 }; // z-index alto para estar sobre el modal
 
-    function randomInRange(min, max) {
-        return Math.random() * (max - min) + min;
-    }
-
-    var interval = setInterval(function() {
-        var timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-        return clearInterval(interval);
+        function randomInRange(min, max) {
+            return Math.random() * (max - min) + min;
         }
 
-        var particleCount = 50 * (timeLeft / duration);
-        // Lanza las partículas desde dos puntos para un efecto más lleno
-        confetti(Object.assign({}, defaults, { 
-            particleCount, 
-            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-            shapes: ['circle'], // ¡CLAVE! Usa círculos en vez de rectángulos
-            colors: ['#ffc107', '#ffca2c', '#ffffff', '#ff9800'] // Colores de fuego/dorado
-        }));
-        confetti(Object.assign({}, defaults, { 
-            particleCount, 
-            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-            shapes: ['circle'], // ¡CLAVE! Usa círculos en vez de rectángulos
-            colors: ['#ffc107', '#ffca2c', '#ffffff', '#ff9800'] // Colores de fuego/dorado
-        }));
-    }, 250);
+        var interval = setInterval(function() {
+            var timeLeft = animationEnd - Date.now();
+            if (timeLeft <= 0) {
+                return clearInterval(interval);
+            }
+            var particleCount = 50 * (timeLeft / duration);
+            confetti(Object.assign({}, defaults, { 
+                particleCount, 
+                origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+                shapes: ['circle'], 
+                colors: ['#ffc107', '#ffca2c', '#ffffff', '#ff9800'] 
+            }));
+            confetti(Object.assign({}, defaults, { 
+                particleCount, 
+                origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+                shapes: ['circle'], 
+                colors: ['#ffc107', '#ffca2c', '#ffffff', '#ff9800'] 
+            }));
+        }, 250);
     }
 
-
-    function mostrarPremiofinal(premio) {
-        document.getElementById('mensajePremio').innerText = premio;
-        enviarDatosPremio();
-    }
-
-
-    // Funciones del Modal y de envío de datos (SIN CAMBIOS)
-    function mostrarPremio(premio) {
-        lanzarFuegosArtificiales();
-
-        // El resto de la función se mantiene igual
-        document.getElementById('mensajePremio').innerText = premio;
-        var premioModal = new bootstrap.Modal(document.getElementById('premioModal'));
-        premioModal.show();
-        setTimeout(function() {
-            enviarDatosPremio();
-        }, 100);
-    }
-
-
-
-
-    function enviarDatosPremio() {
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/polls/guardar-premio/';
-        var csrfToken = '{{ csrf_token }}';
-        var csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrfmiddlewaretoken';
-        csrfInput.value = csrfToken;
-        form.appendChild(csrfInput);
-        var premioInput = document.createElement('input');
-        premioInput.type = 'hidden';
-        premioInput.name = 'premio';
-        premioInput.value = document.getElementById('mensajePremio').innerText;
-        form.appendChild(premioInput);
-        var codigoTicketInput = document.createElement('input');
-        codigoTicketInput.type = 'hidden';
-        codigoTicketInput.name = 'codigo_ticket';
-        codigoTicketInput.value = '{{ codigo_ticket }}';
-        form.appendChild(codigoTicketInput);
-        var encuesta_fijaInput = document.createElement('input');
-        encuesta_fijaInput.type = 'hidden';
-        encuesta_fijaInput.name = 'encuesta_fija';
-        encuesta_fijaInput.value = '{{ encuesta_id }}';
-        form.appendChild(encuesta_fijaInput);
-        var tiendaInput = document.createElement('input');
-        tiendaInput.type = 'hidden';
-        tiendaInput.name = 'tienda';
-        tiendaInput.value = '{{ tienda.id }}';
-        form.appendChild(tiendaInput);
-        document.body.appendChild(form);
-        form.submit();
-    }
-
-    // Funciones de ayuda y matemáticas (SIN CAMBIOS)
-    function toRad(deg){
-        return deg * (Math.PI / 180.0);
-    }
-    
-    function randomRange(min,max){
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-    
-    function easeOutSine(x) {
-        return Math.sin((x * Math.PI) / 2);
-    }
-    
-    function getPercent(input,min,max){
-        return (((input - min) * 100) / (max - min))/100
-    }
+    // Funciones matemáticas de la ruleta
+    function toRad(deg){ return deg * (Math.PI / 180.0); }
+    function randomRange(min,max){ return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function easeOutSine(x) { return Math.sin((x * Math.PI) / 2); }
+    function getPercent(input,min,max){ return (((input - min) * 100) / (max - min))/100; }
     
     function LightenDarkenColor(col, amt) {
         var usePound = false;
-        if (col[0] == "#") {
-            col = col.slice(1);
-            usePound = true;
-        }
+        if (col[0] == "#") { col = col.slice(1); usePound = true; }
         var num = parseInt(col, 16);
         var r = (num >> 16) + amt;
         if (r > 255) r = 255; else if  (r < 0) r = 0;
@@ -417,54 +257,44 @@
         return (usePound ? "#" : "") + (g | (b << 8) | (r << 16)).toString(16).padStart(6, '0');
     }
 
-    // Configuración del Canvas y datos de premios
-    const canvas = document.getElementById("canvas")
-    const ctx = canvas.getContext("2d")
-    const width = document.getElementById("canvas").width
-    const height = document.getElementById("canvas").height
-    const centerX = width/2
-    const centerY = height/2
-    const radius = width/2
-    const premiosRawData = document.getElementById('premios-data').textContent;
-    let modifiedString = premiosRawData.replace(/'/g, '"');
-    const array = JSON.parse(modifiedString);
-    const premiosData = array;
-    const premios = premiosData.map(premio => premio.nombre);
-    const probabilidades = premiosData.map(premio => premio.probabilidad);
-    
-    let items = premios;
-    let currentDeg = 0
-    let step = 360/items.length
-    let itemDegs = {}
-    
-    // ¡Las llamadas a randomColor() han sido eliminadas de aquí!
+    // Configuración Inicial del Canvas
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width/2;
+    const centerY = height/2;
+    const radius = width/2;
 
-    // Función createWheel (CORREGIDA)
+    // Procesar datos inyectados por Django de forma segura
+    const premiosData = JSON.parse(document.getElementById('premios-data').textContent);
+    console.table(premiosData);
+    const items = premiosData.map(premio => premio.nombre);
+    
+    let currentDeg = 0;
+    let step = 360/items.length;
+    let itemDegs = {};
+    
     function createWheel(){
-        items = premios;
         step = 360/items.length;
         draw();
     }
 
-    // Llamada inicial para dibujar la ruleta
     document.fonts.ready.then(function() {
-        console.log("Fuente Montserrat cargada. Dibujando ruleta inicial.");
-        // Ahora que la fuente está lista, dibujamos la ruleta por primera vez
-        draw();
+        draw(); // Dibuja cuando carga la fuente
     });
 
-    // Función draw (NUEVA VERSIÓN)
     function draw(){
         ctx.clearRect(0, 0, width, height);
 
         const palette = ['#c54954', '#003468', '#97222d', '#6b96b8', '#e1253c', '#97a1a7'];
         let startDeg = currentDeg;
 
-        // --- PASO 1: Dibujar TODOS los segmentos (sin cambios) ---
         for(let i = 0; i < items.length; i++){
             let endDeg = startDeg + step;
             let color = palette[i % palette.length];
 
+            // 1. Relleno y gradiente
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.arc(centerX, centerY, radius , toRad(startDeg), toRad(endDeg));
@@ -476,33 +306,29 @@
             ctx.fillStyle = gradient;
             ctx.fill();
 
+            // 2. Patrón de rayas
             ctx.fillStyle = selectPattern;
             ctx.fill();
 
-            // --- NUEVO: DIBUJAR EL BORDE SEPARADOR 3D ---
-            // Calculamos el punto final de la línea del borde (en el perímetro del círculo)
+            // 3. Bordes 3D separadores
             const borderX = centerX + radius * Math.cos(toRad(startDeg));
             const borderY = centerY + radius * Math.sin(toRad(startDeg));
 
-            // 1. Dibujar la sombra (línea oscura y ancha)
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.lineTo(borderX, borderY);
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'; // Negro semi-transparente
-            ctx.lineWidth = 3; // Ancho de la sombra
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'; 
+            ctx.lineWidth = 3; 
             ctx.stroke();
 
-            // 2. Dibujar el brillo (línea clara y delgada encima de la sombra)
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.lineTo(borderX, borderY);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'; // Blanco semi-transparente
-            ctx.lineWidth = 1; // Ancho del brillo
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'; 
+            ctx.lineWidth = 1; 
             ctx.stroke();
-            // --- FIN DEL CÓDIGO NUEVO ---
 
-
-
+            // 4. Texto
             ctx.save();
             ctx.translate(centerX, centerY);
             ctx.rotate(toRad((startDeg + endDeg) / 2));
@@ -516,66 +342,119 @@
             ctx.restore();
 
             itemDegs[items[i]] = { "startDeg": startDeg, "endDeg" : endDeg };
-
-            if(startDeg % 360 < 360 && startDeg % 360 > 270 && endDeg % 360 > 0 && endDeg % 360 < 90 ){
-                document.getElementById("winner").innerHTML = items[i];
-            }
-
             startDeg += step;
         }
-
-
-
     }
 
-    // Lógica de animación y giro (SIN CAMBIOS)
-    let speed = 0
-    let maxRotation = randomRange(360* 3, 360 * 6)
-    let pause = false
+    // --- VARIABLES DE ANIMACIÓN ---
+    let speed = 0;
+    let maxRotation = 0;
+    let pause = false;
+    let isSpinning = false;
+    let resultadoFinal = null;
 
     function animate(){
-        if(pause){ return }
+        if(pause){ return; }
         speed = easeOutSine(getPercent(currentDeg, maxRotation, 0)) * 20;
+        
         if(speed < 0.01){
-            speed = 0
-            pause = true
-            const ganador = document.getElementById("winner").innerHTML;
-            mostrarPremiofinal(ganador);
+            speed = 0;
+            pause = true;
+            isSpinning = false;
+            mostrarResultadoModal(resultadoFinal);
         }
-        currentDeg += speed
-        draw()
+        currentDeg += speed;
+        draw();
         window.requestAnimationFrame(animate);
     }
     
-    function spin(){
-        if(speed != 0){ return }
-        //document.getElementById("winner").style.display = "block";
-        maxRotation = 0;
-        currentDeg = 0;
-        createWheel();
-        draw();
-        let premioUser = selectPrize(premios, probabilidades);
-        maxRotation = (360 * 5) - itemDegs[premioUser].endDeg + 10;
-        itemDegs = {};
-        pause = false;
-        window.requestAnimationFrame(animate);
-    }
+    // --- NUEVA LÓGICA DE SORTEO SEGURO CON AJAX ---
+    async function spin() {
+        // Bloquear doble click
+        if (speed != 0 || isSpinning) { return; }
+        isSpinning = true;
 
-    function selectPrize(premios, probabilidades) {
-        if (premios.length !== probabilidades.length) {
-            throw new Error("Las longitudes de premios y probabilidades deben ser iguales.");
-        }
-        const totalProbability = probabilidades.reduce((a, b) => a + b, 0);
-        const random = Math.random() * totalProbability;
-        let accumulated = 0;
-        for (let i = 0; i < probabilidades.length; i++) {
-            accumulated += probabilidades[i];
-            if (random < accumulated) {
-                return premios[i];
+        try {
+            // Preparar datos para el backend
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            formData.append('codigo_ticket', '{{ codigo_ticket }}');
+            formData.append('tienda_id', '{{ tienda.id }}');
+            formData.append('encuesta_id', '{{ encuesta_id }}');
+
+            // Llamar a nuestra nueva vista asíncrona y segura
+            const response = await fetch('{% url "ejecutar_sorteo_ajax" %}', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                alert("Error: " + (errorData.error || "No se pudo realizar el sorteo."));
+                isSpinning = false;
+                return;
             }
+
+            const data = await response.json();
+            
+            // Guardar lo que dictaminó el servidor
+            resultadoFinal = {
+                nombre: data.nombre_premio,
+                es_premio_real: data.es_premio_real
+            };
+
+            // Restablecer la ruleta a cero
+            maxRotation = 0;
+            currentDeg = 0;
+            createWheel();
+            draw();
+
+            // Buscar en el diccionario visual dónde está la tajada que debemos mostrar
+            const targetDeg = itemDegs[resultadoFinal.nombre];
+            if (!targetDeg) {
+                console.error("Premio dictaminado por el servidor no existe en la visual de la ruleta.");
+                isSpinning = false;
+                return;
+            }
+
+            // Calculamos cuánto debe girar: Varias vueltas enteras + caer dentro de los ángulos de la tajada
+            maxRotation = (360 * 5) - targetDeg.endDeg + randomRange(5, step - 5);
+            
+            pause = false;
+            window.requestAnimationFrame(animate);
+
+        } catch (error) {
+            console.error("Error en la petición del sorteo:", error);
+            alert("Hubo un problema de conexión. Intente nuevamente.");
+            isSpinning = false;
         }
     }
+
+    // --- FUNCIÓN PARA MOSTRAR EL RESULTADO FINAL ---
+    function mostrarResultadoModal(resultado) {
+        document.getElementById('mensajePremio').innerText = resultado.nombre;
+        const imgModal = document.getElementById('imagenModalResultado');
+        
+        if (resultado.es_premio_real) {
+            // Es un premio real: Confeti e imagen de felicidades
+            imgModal.src = "{% static 'images/felicidades.png' %}";
+            imgModal.style.display = "block";
+            lanzarFuegosArtificiales();
+        } else {
+            // Es "Sigue intentando": Cambiamos la imagen por la de consolación
+            imgModal.src = "{% static 'images/sigue_intentando.png' %}"; // <-- PON AQUÍ EL NOMBRE DE TU IMAGEN
+            imgModal.style.display = "block"; // Nos aseguramos de que sea visible
+        }
+
+        var premioModal = new bootstrap.Modal(document.getElementById('premioModal'));
+        premioModal.show();
+    }
+
+    // --- REDIRIGIR AL CERRAR ---
+    function finalizarSorteo() {
+        // Al darle al botón "Finalizar" lo mandamos al index o a donde prefieras
+        window.location.href = "{% url 'index' %}"; 
+    }
+
 </script>
-
-
 {% endblock %}

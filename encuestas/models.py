@@ -3,7 +3,7 @@ from datetime import date
 from django.utils import timezone
 from django.urls import reverse
 from decimal import Decimal
-from django.db import models
+from django.db import models, transaction
 from django.utils.html import format_html
 
 
@@ -193,6 +193,7 @@ class Respuesta(models.Model):
 class Premio(models.Model):
     nombre = models.CharField(max_length=255, unique=True)
     descripcion = models.TextField(null=True, blank=True)
+    es_premio = models.BooleanField(default=True, verbose_name="¿Es un premio real?")
 
     # --- CAMBIO AQUÍ: AÑADIR EL CAMPO DE IMAGEN ---
     imagen = models.ImageField(
@@ -226,6 +227,13 @@ class TiendaPremio(models.Model):
         blank=False,
         null=False,
         db_index=True  # Indexar para mejorar el rendimiento de la ordenación
+    )
+
+    fecha_activacion = models.DateField(
+        null=True, 
+        blank=True, 
+        verbose_name="Activo desde",
+        help_text="El premio no saldrá sorteado antes de esta fecha."
     )
 
 
@@ -292,12 +300,47 @@ class TiendaPremio(models.Model):
 
     def stock_disponible(self, monto: Decimal) -> int:
         """
-        Si el monto no alcanza el mínimo para este premio, devuelve 0,
-        en caso contrario la cantidad real.
+        Calcula el stock real considerando monto y fecha de activación.
         """
+        # 1. Validar monto mínimo
         if monto < self.monto_minimo_premio:
             return 0
+        
+        # 2. Validar fecha de activación
+        if self.fecha_activacion and self.fecha_activacion > timezone.now().date():
+            return 0
+            
         return self.cantidad
+    
+    @transaction.atomic
+    def sortear_premio_seguro(self, monto: Decimal):
+        """
+        Lógica de sorteo con bloqueo de base de datos para evitar sobre-entrega.
+        """
+        # Obtenemos todos los premios de la tienda bloqueando las filas para esta transacción
+        premios_qs = TiendaPremio.objects.select_for_update().filter(tienda=self.tienda)
+        
+        candidatos = []
+        pesos = []
+        
+        for tp in premios_qs:
+            stock = tp.stock_disponible(monto)
+            if stock > 0:
+                candidatos.append(tp)
+                pesos.append(stock)
+        
+        if not candidatos:
+            return None # O manejar un "No ganó" por defecto de emergencia
+
+        # Sorteo ponderado
+        seleccionado = random.choices(candidatos, weights=pesos, k=1)[0]
+        
+        # Descontar stock (sea premio o no, el stock de 'No ganó' también se consume para la probabilidad)
+        if seleccionado.cantidad > 0:
+            seleccionado.cantidad -= 1
+            seleccionado.save()
+            
+        return seleccionado.premio
 
 class FormularioEncFija(models.Model):
     nombre = models.CharField(max_length=100)

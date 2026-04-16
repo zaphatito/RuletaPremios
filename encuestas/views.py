@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from cupones import models
 from cupones.models import Cupon
-from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea
+from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea, transaction
 from .forms import EncuestaForm, EncuestaFijaForm, TicketForm
 from django.utils.html import format_html
 from django.db.models import F
@@ -17,6 +17,81 @@ import json
 
 
 # Create your views here.
+
+
+@transaction.atomic
+def ejecutar_sorteo_ajax(request):
+    """
+    Se ejecuta vía POST desde el frontend al hacer clic en 'Girar Ruleta'.
+    Realiza el cálculo matemático en el servidor de manera segura.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    codigo_ticket = request.POST.get('codigo_ticket')
+    tienda_id = request.POST.get('tienda_id')
+    encuesta_id = request.POST.get('encuesta_id')
+
+    if not all([codigo_ticket, tienda_id, encuesta_id]):
+        return JsonResponse({'error': 'Faltan parámetros'}, status=400)
+
+    try:
+        tienda = Tienda.objects.get(id=tienda_id, activa=True)
+        encuesta_fija = EncuestaFija.objects.get(id=encuesta_id)
+        respuesta = EncuestaFijaRespuesta.objects.get(codigo_ticket=codigo_ticket)
+    except (Tienda.DoesNotExist, EncuestaFija.DoesNotExist, EncuestaFijaRespuesta.DoesNotExist):
+        return JsonResponse({'error': 'Datos inválidos'}, status=400)
+
+    # 1. Verificar que no haya girado ya (evita doble submit)
+    if EncuestaFijaPremio.objects.filter(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija).exists():
+        return JsonResponse({'error': 'Ya participaste. Premio entregado anteriormente.'}, status=403)
+
+    # 2. Obtener monto del ticket para validar
+    ticket_consulta = TicketConsulta.objects.filter(tienda=tienda, codigo=codigo_ticket).first()
+    monto = ticket_consulta.monto if ticket_consulta else Decimal('0')
+
+    # 3. Bloquear filas y calcular probabilidades (Evita concurrencia / premio congelado)
+    premios_qs = TiendaPremio.objects.select_for_update().filter(tienda=tienda, visible=True)
+    
+    candidatos = []
+    pesos = []
+
+    for tp in premios_qs:
+        stock = tp.stock_disponible(monto)
+        if stock > 0:
+            candidatos.append(tp)
+            pesos.append(stock)
+
+    if not candidatos:
+        return JsonResponse({'error': 'No hay premios disponibles en este momento.'}, status=400)
+
+    # 4. El Sorteo Matemático
+    seleccionado = random.choices(candidatos, weights=pesos, k=1)[0]
+
+    # 5. Descontar Stock (Tanto para premios reales como para "No premios")
+    seleccionado.cantidad -= 1
+    seleccionado.save()
+
+    # 6. Registrar en EncuestaFijaPremio (Incluso si es "Suerte en la próxima", para que quede el historial)
+    EncuestaFijaPremio.objects.create(
+        encuesta_fija=encuesta_fija,
+        respuesta=respuesta,
+        nombre=respuesta.nombre,
+        apellidos=respuesta.apellidos,
+        codigo_ticket=codigo_ticket,
+        DNI=respuesta.DNI,
+        premio=seleccionado.premio,
+        tienda=tienda,
+    )
+
+    # 7. Devolver el resultado al frontend
+    return JsonResponse({
+        'status': 'success',
+        'premio_id': seleccionado.premio.id,
+        'nombre_premio': seleccionado.premio.nombre,
+        'es_premio_real': seleccionado.premio.es_premio
+    })
+
 
 def consultaEncuestaFijaTiendaApi(request, tienda_id):
     """
@@ -167,9 +242,11 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
     for tp in premios_qs:
         stock = tp.stock_disponible(monto)  # devuelve real o 0
         premio_data.append({
+            'id': tp.premio.id, # Agrega el ID para que el frontend sepa identificarlo
             'nombre': tp.premio.nombre,
             'stock':  stock,
             'probabilidad': stock,
+            'es_premio': tp.premio.es_premio # Nuevo campo
         })
 
     # Obtener los premios de la tienda con su stock
@@ -179,12 +256,12 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
 #        {'nombre': premio.premio.nombre, 'probabilidad': premio.cantidad}
 #        for premio in premios
 #    ]
-    
+    premios_json = json.dumps(premio_data)
     context = {
         'tienda': tienda,
         'encuesta_id': encuesta_fija.id,
         'codigo_ticket': codigo_ticket,
-        'premiosDat': premio_data,
+        'premiosDat': premios_json,
         'respuestas': respuestas,
         'tipojuego': encuesta_fija.tipo_juego,
     }
@@ -283,7 +360,7 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
                     prem = premio_existente.premio
                     idprem = premio_existente.premio.descripcion
                     idnombre = premio_existente.respuesta.DNI
-                    errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente Ganador<br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><span>({idprem})</span><br><br>"
+                    errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><span>({idprem})</span><br><br>"
                     return render(request, 'RespEmitida.html', { 'error': errorprem, 'texto': "¡Gracias por participar!" })
                 except EncuestaFijaPremio.DoesNotExist:
                     # Si la encuesta fue llenada ('utilizado'=True) pero el premio NO ha sido entregado,

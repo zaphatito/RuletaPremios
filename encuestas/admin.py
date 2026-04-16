@@ -11,12 +11,12 @@ class TiendaPremioResource(resources.ModelResource):
 #    exclude = ('id', )
     class Meta:
         model = TiendaPremio 
-        fields = ('tienda__nombre', 'premio__nombre', 'cantidad', 'monto_minimo_premio', 'id', 'visible',)
+        fields = ('tienda__nombre', 'premio__nombre', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'id', 'visible',)
 
 
 
 class PremioResources(resources.ModelResource):
-    fields = ('nombre', 'id',)
+    fields = ('nombre', 'id', 'es_premio')
     class Meta:
         model = Premio
 
@@ -25,7 +25,8 @@ class PremioResources(resources.ModelResource):
 @admin.register(Premio)
 class PremioAdmin(ImportExportModelAdmin):
     resource_class = PremioResources
-    list_display = ('nombre', 'vista_previa_imagen', 'descripcion')
+    list_display = ('nombre', 'vista_previa_imagen', 'es_premio', 'descripcion')
+    list_filter = ('es_premio',)
     readonly_fields = ('vista_previa_imagen',) # Muestra la imagen también en el formulario de edición
     search_fields = ('nombre',)
 
@@ -40,16 +41,16 @@ class PremioAdmin(ImportExportModelAdmin):
 class TiendaPremioInline(admin.TabularInline):
     model = TiendaPremio
     extra = 0  # Número de formularios vacíos que se mostrarán por defecto
-    fields = ('premio', 'cantidad', 'monto_minimo_premio', 'visible', 'orden')  # Campos que se mostrarán en el inline
+    fields = ('premio', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'visible', 'orden')  # Campos que se mostrarán en el inline
     # Puedes definir 'readonly_fields' si algunos campos no deben ser editables
     sortable_field_name = "orden"
 
 @admin.register(TiendaPremio)
 class TiendaPremioAdmin(ImportExportModelAdmin):
     resource_class = TiendaPremioResource
-    list_display = ('tienda', 'premio', 'cantidad')
+    list_display = ('tienda', 'premio', 'cantidad', 'fecha_activacion', 'visible')
     search_fields = ('tienda__nombre', 'premio__nombre')
-    list_filter = ('tienda', 'premio')
+    list_filter = ('tienda', 'premio', 'visible')
 
 
 
@@ -142,7 +143,7 @@ class EncuestaAdmin(admin.ModelAdmin):
             url = reverse('polls', args=[tienda.id, obj.id])
             enlaces += format_html('<a href="{}">{}</a><br>', url, tienda.nombre)
         
-        return format_html(enlaces)
+        return mark_safe(enlaces)
 
     tiendas_asignadas_enlaces.short_description = "Enlaces a la encuesta para cada tienda"
 
@@ -196,7 +197,7 @@ class EncuestaFijaAdmin(admin.ModelAdmin):
             url = reverse('fija', args=[tienda.id, obj.id])
             enlaces += format_html('<a href="{}">{}</a><br>', url, tienda.nombre)
         
-        return format_html(enlaces)
+        return mark_safe(enlaces)
     # Método para mostrar las categorías en la lista de cupones
     def display_tiendas(self, obj):
         return ", ".join([cat.nombre for cat in obj.tiendas.all()])
