@@ -138,15 +138,22 @@
 {% block content %}
 <div class="modal fade" id="premioModal" tabindex="-1" aria-labelledby="premioModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header border-0">
-            <img id="imagenModalResultado" src="{% static 'images/felicidades.png' %}" class="img-fluid mx-auto d-block" alt="...">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <img id="imagenModalResultado" src="{% static 'images/felicidades.png' %}" class="img-fluid mx-auto d-block" alt="...">
+            </div>
+            <div class="modal-body text-center">
+                <div id="contenedorImagenPremio" style="margin-bottom: 1.5rem; display: none;">
+                    <img id="fotoPremio" src="" class="img-fluid rounded" style="max-height: 150px; object-fit: contain;">
+                </div>
+
+                <p id="mensajePremio" style="color:#FFFFFF; font-size: 2rem; margin-bottom: 0.5rem;" class="fw-bold"></p> 
+                
+                <p id="descripcionPremio" style="color:#cccccc; font-size: 1.1rem; margin-bottom: 2rem;"></p>
+
+                <button type="button" class="btn btn-light btn-lg" onclick="finalizarSorteo()">Finalizar</button>
+            </div>
         </div>
-        <div class="modal-body text-center">
-            <p id="mensajePremio" style="color:#FFFFFF; font-size: 2rem; margin: 2rem 0;" class="fw-bold"></p> 
-            <button type="button" class="btn btn-light btn-lg mt-3" onclick="finalizarSorteo()">Finalizar</button>
-        </div>
-      </div>
     </div>
 </div>
 
@@ -396,10 +403,11 @@
             }
 
             const data = await response.json();
-            
-            // Guardar lo que dictaminó el servidor
+                
             resultadoFinal = {
                 nombre: data.nombre_premio,
+                descripcion: data.descripcion_premio, // Capturamos descripción
+                imagen: data.imagen_url,             // Capturamos imagen
                 es_premio_real: data.es_premio_real
             };
 
@@ -433,27 +441,34 @@
     // --- FUNCIÓN PARA MOSTRAR EL RESULTADO FINAL ---
     function mostrarResultadoModal(resultado) {
         document.getElementById('mensajePremio').innerText = resultado.nombre;
-        const imgModal = document.getElementById('imagenModalResultado');
+        document.getElementById('descripcionPremio').innerText = resultado.descripcion;
+        
+        const imgBanner = document.getElementById('imagenModalResultado');
+        const contenedorFoto = document.getElementById('contenedorImagenPremio');
+        const fotoPremio = document.getElementById('fotoPremio');
         
         if (resultado.es_premio_real) {
-            // Es un premio real: Confeti e imagen de felicidades
-            imgModal.src = "{% static 'images/felicidades.png' %}";
-            imgModal.style.display = "block";
+            imgBanner.src = "{% static 'images/felicidades.png' %}";
+            imgBanner.style.display = "block";
+            
+            // Si el premio tiene una imagen cargada en el admin, la mostramos
+            if (resultado.imagen) {
+                fotoPremio.src = resultado.imagen;
+                contenedorFoto.style.display = "block";
+            } else {
+                contenedorFoto.style.display = "none";
+            }
+            
             lanzarFuegosArtificiales();
         } else {
-            // Es "Sigue intentando": Cambiamos la imagen por la de consolación
-            imgModal.src = "{% static 'images/sigue_intentando.png' %}"; // <-- PON AQUÍ EL NOMBRE DE TU IMAGEN
-            imgModal.style.display = "block"; // Nos aseguramos de que sea visible
+            // Caso de "Suerte para la próxima"
+            imgBanner.src = "{% static 'images/sigue_intentando.png' %}";
+            imgBanner.style.display = "block";
+            contenedorFoto.style.display = "none";
         }
 
         var premioModal = new bootstrap.Modal(document.getElementById('premioModal'));
         premioModal.show();
-    }
-
-    // --- REDIRIGIR AL CERRAR ---
-    function finalizarSorteo() {
-        // Al darle al botón "Finalizar" lo mandamos al index o a donde prefieras
-        window.location.href = "{% url 'index' %}"; 
     }
 
 </script>

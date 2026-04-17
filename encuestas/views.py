@@ -87,9 +87,11 @@ def ejecutar_sorteo_ajax(request):
     # 7. Devolver el resultado al frontend
     return JsonResponse({
         'status': 'success',
-        'premio_id': seleccionado.premio.id,
-        'nombre_premio': seleccionado.premio.nombre,
-        'es_premio_real': seleccionado.premio.es_premio
+        'premio_id': premio.id,
+        'nombre_premio': premio.nombre,
+        'descripcion_premio': premio.descripcion or "", # Enviamos la descripción
+        'imagen_url': premio.imagen.url if premio.imagen else None, # Enviamos la URL de la imagen
+        'es_premio_real': premio.es_premio
     })
 
 
